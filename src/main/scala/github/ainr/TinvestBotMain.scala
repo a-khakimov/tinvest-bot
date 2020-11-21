@@ -6,8 +6,10 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import github.ainr.tinvest.client.{TInvestApi, TInvestApiHttp4s}
 import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
+
 import scala.concurrent.duration.FiniteDuration
 import doobie.ExecutionContexts
+import github.ainr.tinvest.orders.LimitOrderRequest
 
 object TinvestBotMain extends IOApp {
 
@@ -21,7 +23,9 @@ object TinvestBotMain extends IOApp {
       portfolio <- resources().use {
         case httpClient => {
           implicit val tinvestApiHttp4s: TInvestApi[F] = new TInvestApiHttp4s[F](httpClient)
-          tinvestApiHttp4s.getPortfolio()
+          val limitOrder = tinvestApiHttp4s.limitOrder("BBG009S39JX6", LimitOrderRequest(1, "Buy", 1))
+          val portfolio = tinvestApiHttp4s.getPortfolio()
+          portfolio
         }
       }
       _ = println(portfolio)

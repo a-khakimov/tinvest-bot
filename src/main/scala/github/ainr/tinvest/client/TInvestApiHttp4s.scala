@@ -2,7 +2,6 @@ package github.ainr.tinvest.client
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
 import github.ainr.TinvestBotMain.tinvest_token
-import github.ainr.tinvest.Portfolio
 import org.http4s.{AuthScheme, Credentials}
 import org.http4s.Method
 import org.http4s.client.Client
@@ -19,9 +18,12 @@ import org.http4s.client._
 import org.http4s.client.dsl.io._
 import org.http4s.client.blaze._
 import cats.effect.IO
+import github.ainr.tinvest.orders.{LimitOrder, LimitOrderRequest}
+import github.ainr.tinvest.portfolio.Portfolio
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.auto.exportDecoder
 import io.circe.generic.auto.exportEncoder
+import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.dsl.io.GET
 
 class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])(
@@ -42,6 +44,22 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])
         .withMethod(Method.GET)
         .withUri(uri)
       res <- client.expect(req)(jsonOf[F, Portfolio])
+    } yield res
+  }
+
+  override def limitOrder(figi: String, request: LimitOrderRequest): F[LimitOrder] = {
+    for {
+      uri <- F.fromEither[Uri](
+        Uri.fromString(s"$baseUrl/orders/limit-order?figi=${figi}")
+      )
+      req = Request[F]()
+        .putHeaders(
+          Authorization(Credentials.Token(AuthScheme.Bearer, tinvest_token)),
+          Accept(MediaType.application.json))
+        .withMethod(Method.POST)
+        .withEntity(request)
+        .withUri(uri)
+      res <- client.expect(req)(jsonOf[F, LimitOrder])
     } yield res
   }
 }
