@@ -1,7 +1,7 @@
 package github.ainr.tinvest.client
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
-import github.ainr.TinvestBotMain.tinvest_token
+import github.ainr.Main.tinvest_token
 import org.http4s.{AuthScheme, Credentials}
 import org.http4s.Method
 import org.http4s.client.Client
