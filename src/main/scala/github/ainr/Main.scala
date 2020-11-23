@@ -1,35 +1,51 @@
 package github.ainr
 
-import java.util.concurrent.TimeUnit
 import doobie.ExecutionContexts
-import scala.concurrent.duration.FiniteDuration
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{Blocker, ExitCode, IO, IOApp}
+import github.ainr.config.Config
 import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.implicits.http4sKleisliResponseSyntaxOptionT
-import github.ainr.tinvest.client.{TInvestApiHttp4s}
+import github.ainr.tinvest.client.TInvestApiHttp4s
 import github.ainr.service.TInvestBotRoutes
+import github.ainr.telegram.TgBot
+import org.slf4j.LoggerFactory
+import telegramium.bots.high.BotApi
+
+import scala.concurrent.duration.DurationInt
+import scala.util.Success
 
 object Main extends IOApp {
 
+  private val log = LoggerFactory.getLogger("Main")
+
   type F[+T] = IO[T]
   val iohi = IO { println("hi there") }
-  val tinvest_token = "t.5in2aATiub3iHxFg7jHI0t2jpaUgEAlJNVV2di3QkGukmDkRw6dJAYitMb9S7yjyKSGLVgdoXc-sy4VN1YoD3Q"
 
   override def run(args: List[String]): IO[ExitCode] = {
-    resources.use(_ => IO.never).as(ExitCode.Success)
+    for {
+      _ <- iohi
+      configFile <- IO { Option(System.getProperty("application.conf")) }
+      config <- Config.load[IO](configFile)
+      _ <- IO { log.info(s"loaded config: $config") }
+      _ <- resources.use {
+        case (httpClient, blocker) => {
+          implicit val tgBotApi = new BotApi[IO](httpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
+          implicit val tgBot = new TgBot[IO]()
+          for {
+            _ <- tgBot.start()
+          } yield ()
+        }
+      }
+    } yield ExitCode.Success
   }
 
   def resources = {
     for {
       ec <- ExecutionContexts.cachedThreadPool[F]
       httpClient <- BlazeClientBuilder[F](ec).resource
-      tinvestApiHttp4s = new TInvestApiHttp4s[F](httpClient)
-      httpApp = Router("/" -> TInvestBotRoutes[F](tinvestApiHttp4s)).orNotFound
-      httpServer <- BlazeServerBuilder[F](ec)
-        .bindHttp(8080, "localhost")
-        .withHttpApp(httpApp).resource
-    } yield (httpClient, httpServer)
+      blocker <- Blocker[IO]
+    } yield (httpClient, blocker)
   }
 }

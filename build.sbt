@@ -7,6 +7,8 @@ scalaVersion := "2.13.4"
 val circeVersion = "0.13.0"
 val http4sVersion = "0.21.7"
 val doobieVersion = "0.8.8"
+val telegramiumVersion = "2.49.0"
+val pureConfigVersion = "0.13.0"
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.0",
@@ -21,6 +23,9 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-parser" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-generic-extras" % circeVersion,
+  "io.github.apimorphism" %% "telegramium-core" % telegramiumVersion,
+  "io.github.apimorphism" %% "telegramium-high" % telegramiumVersion,
+  "com.github.pureconfig" %% "pureconfig" % pureConfigVersion,
   "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
 )
 
