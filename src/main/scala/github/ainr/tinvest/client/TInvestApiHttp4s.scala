@@ -1,29 +1,21 @@
 package github.ainr.tinvest.client
+
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
 import org.http4s.{AuthScheme, Credentials}
 import org.http4s.Method
 import org.http4s.client.Client
 import org.http4s.headers.{Accept, Authorization}
-import org.http4s.client.dsl.io._
 import org.http4s.MediaType
-import org.http4s.implicits.http4sLiteralsSyntax
-import io.circe.generic.auto.exportDecoder
 import org.http4s.circe.jsonOf
 import cats.implicits._
 import org.http4s._
-import io.circe.generic.auto._
-import org.http4s.client._
-import org.http4s.client.dsl.io._
-import org.http4s.client.blaze._
-import cats.effect.IO
 import github.ainr.tinvest.orders.{LimitOrder, LimitOrderRequest}
 import github.ainr.tinvest.portfolio.Portfolio
-import io.circe.{Decoder, Encoder}
 import io.circe.generic.auto.exportDecoder
 import io.circe.generic.auto.exportEncoder
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
-import org.http4s.dsl.io.GET
+
 
 class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])(
   implicit F: MonadError[F, Throwable]
@@ -62,3 +54,4 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])
     } yield res
   }
 }
+
