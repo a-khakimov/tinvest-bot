@@ -1,20 +1,16 @@
-package github.ainr.tinvest.client
+package github.ainr.tinvest.client.rest
 
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
-import org.http4s.{AuthScheme, Credentials}
-import org.http4s.Method
-import org.http4s.client.Client
-import org.http4s.headers.{Accept, Authorization}
-import org.http4s.MediaType
-import org.http4s.circe.jsonOf
 import cats.implicits._
-import org.http4s._
 import github.ainr.tinvest.orders.{LimitOrder, LimitOrderRequest}
 import github.ainr.tinvest.portfolio.Portfolio
-import io.circe.generic.auto.exportDecoder
-import io.circe.generic.auto.exportEncoder
+import io.circe.generic.auto.{exportDecoder, exportEncoder}
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
+import org.http4s.circe.jsonOf
+import org.http4s.client.Client
+import org.http4s.headers.{Accept, Authorization}
+import org.http4s.{AuthScheme, Credentials, MediaType, Method, _}
 
 
 class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])(

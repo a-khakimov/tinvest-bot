@@ -1,7 +1,6 @@
 package github.ainr
 
 import java.io.File
-
 import cats.effect.Sync
 import cats.implicits._
 import com.typesafe.config.ConfigFactory
@@ -9,14 +8,15 @@ import pureconfig.error.ConfigReaderException
 
 
 package object config {
-  case class  DbConfig(driver: String,
+  case class DbConfig(driver: String,
                        url: String,
                        user: String,
                        password: String)
 
-  case class  Config(database: DbConfig,
+  case class Config(database: DbConfig,
                      tgBotApiToken: String,
-                     tinkoffInvestApiToken: String)
+                     tinkoffInvestApiToken: String,
+                     tinkoffInvestWss: String)
 
   object Config {
     import pureconfig.generic.auto._

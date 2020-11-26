@@ -2,11 +2,11 @@ package github.ainr
 
 import cats.effect.IO.ioConcurrentEffect
 import doobie.ExecutionContexts
-import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
+import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import github.ainr.config.Config
 import org.http4s.client.blaze.BlazeClientBuilder
 import github.ainr.telegram.TgBot
-import github.ainr.tinvest.client.ws.{Request, TInvestWSApiHttp4s}
+import github.ainr.tinvest.client.wss.TInvestWSApiHttp4s
 import org.http4s.{Header, Headers}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.slf4j.LoggerFactory
@@ -31,12 +31,13 @@ object Main extends IOApp {
           implicit val tgBot = new TgBot[IO]()
           implicit val tinvestWSApi = new TInvestWSApiHttp4s[IO](wsClient)
 
-
           for {
-            _ <- tinvestWSApi.subscribeCandle(Request())
-            f1 <- tgBot.start().start
+            _ <- tinvestWSApi.subscribeCandle("BBG009S39JX6", "1min")
+            _ <- tinvestWSApi.subscribeOrderbook("BBG009S39JX6", 2)
+            _ <- tinvestWSApi.subscribeInstrumentInfo("BBG009S39JX6")
             f2 <- tinvestWSApi.listen().start
-            _ <- f1.join
+            //f1 <- tgBot.start().start
+            //_ <- f1.join
             _ <- f2.join
           } yield ()
         }
@@ -46,7 +47,7 @@ object Main extends IOApp {
 
   def resources(config: Config) = {
     import java.net.http.HttpClient
-    import org.http4s.client.jdkhttpclient.{JdkWSClient, WSFrame, WSRequest}
+    import org.http4s.client.jdkhttpclient.{JdkWSClient, WSRequest}
 
     val wsUri = uri"wss://api-invest.tinkoff.ru/openapi/md/v1/md-openapi/ws"
     val wsHeaders = Headers.of(Header("Authorization", s"Bearer ${config.tinkoffInvestApiToken}"))
