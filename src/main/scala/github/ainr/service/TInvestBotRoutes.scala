@@ -6,7 +6,7 @@ import io.circe.syntax.EncoderOps
 import org.http4s.HttpRoutes
 import org.http4s.circe.jsonEncoder
 import cats.implicits._
-import github.ainr.tinvest.client.rest.TInvestApi
+import github.ainr.tinvest4s.rest.client.TInvestApi
 import org.http4s.dsl.Http4sDsl
 
 /* for testing */

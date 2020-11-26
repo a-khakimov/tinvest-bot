@@ -6,7 +6,7 @@ import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import github.ainr.config.Config
 import org.http4s.client.blaze.BlazeClientBuilder
 import github.ainr.telegram.TgBot
-import github.ainr.tinvest.client.wss.TInvestWSApiHttp4s
+import github.ainr.tinvest4s.websocket.client.TInvestWSApiHttp4s
 import org.http4s.{Header, Headers}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.slf4j.LoggerFactory
@@ -33,8 +33,8 @@ object Main extends IOApp {
 
           for {
             _ <- tinvestWSApi.subscribeCandle("BBG009S39JX6", "1min")
-            _ <- tinvestWSApi.subscribeOrderbook("BBG009S39JX6", 2)
-            _ <- tinvestWSApi.subscribeInstrumentInfo("BBG009S39JX6")
+            //_ <- tinvestWSApi.subscribeOrderbook("BBG009S39JX6", 15)
+            //_ <- tinvestWSApi.subscribeInstrumentInfo("BBG009S39JX6")
             f2 <- tinvestWSApi.listen().start
             //f1 <- tgBot.start().start
             //_ <- f1.join

@@ -1,4 +1,4 @@
-package github.ainr.tinvest.orders
+package github.ainr.tinvest4s.rest.orders
 
 case class Orders()
 

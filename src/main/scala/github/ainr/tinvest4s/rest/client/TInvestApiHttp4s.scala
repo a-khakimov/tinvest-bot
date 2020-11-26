@@ -1,10 +1,10 @@
-package github.ainr.tinvest.client.rest
+package github.ainr.tinvest4s.rest.client
 
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
 import cats.implicits._
-import github.ainr.tinvest.orders.{LimitOrder, LimitOrderRequest}
-import github.ainr.tinvest.portfolio.Portfolio
+import github.ainr.tinvest4s.rest.orders.{LimitOrder, LimitOrderRequest}
+import github.ainr.tinvest4s.rest.portfolio.Portfolio
 import io.circe.generic.auto.{exportDecoder, exportEncoder}
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.circe.jsonOf
