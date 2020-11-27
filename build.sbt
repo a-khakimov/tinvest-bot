@@ -4,9 +4,10 @@ ThisBuild / organization := "github.ainr"
 
 scalaVersion := "2.13.4"
 
+val catsVersion = "2.1.4"
 val circeVersion = "0.13.0"
 val http4sVersion = "0.21.7"
-val doobieVersion = "0.8.8"
+val doobieVersion = "0.9.0"
 val telegramiumVersion = "2.49.0"
 val pureConfigVersion = "0.13.0"
 
@@ -15,6 +16,9 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-core" % "2.1.1",
   "org.typelevel" %% "cats-effect" % "2.1.4",
   "org.tpolecat" %% "doobie-core" % doobieVersion,
+  "org.tpolecat" %% "doobie-postgres" % doobieVersion,
+  "org.tpolecat" %% "doobie-specs2" % doobieVersion % "test",
+  "org.tpolecat" %% "doobie-hikari" % doobieVersion,
   "org.http4s" %% "http4s-dsl" % http4sVersion,
   "org.http4s" %% "http4s-circe" % http4sVersion,
   "org.http4s" %% "http4s-blaze-client" % http4sVersion,
@@ -33,3 +37,5 @@ libraryDependencies ++= Seq(
 scalacOptions ++= Seq(
   "-Xfatal-warnings"
 )
+
+addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.1" cross CrossVersion.full)
