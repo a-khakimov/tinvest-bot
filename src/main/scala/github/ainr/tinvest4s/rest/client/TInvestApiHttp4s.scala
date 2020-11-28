@@ -13,20 +13,22 @@ import org.http4s.headers.{Accept, Authorization}
 import org.http4s.{AuthScheme, Credentials, MediaType, Method, _}
 
 
-class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])(
+class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
+                                                              token: String,
+                                                              sandbox: Boolean = true)(
   implicit F: MonadError[F, Throwable]
 ) extends TInvestApi[F] {
 
-  val baseUrl = "https://api-invest.tinkoff.ru/openapi/sandbox"
+  private val baseUrl: String = {
+    "https://api-invest.tinkoff.ru/openapi/sandbox"
+  }
 
   override def getPortfolio(): F[Portfolio] = {
     for {
-      uri <- F.fromEither[Uri](
-        Uri.fromString(s"$baseUrl/portfolio")
-      )
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/portfolio"))
       req = Request[F]()
         .putHeaders(
-          Authorization(Credentials.Token(AuthScheme.Bearer, "tinvest_token")),
+          Authorization(Credentials.Token(AuthScheme.Bearer, token)),
           Accept(MediaType.application.json))
         .withMethod(Method.GET)
         .withUri(uri)
@@ -36,12 +38,10 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F])
 
   override def limitOrder(figi: String, request: LimitOrderRequest): F[LimitOrder] = {
     for {
-      uri <- F.fromEither[Uri](
-        Uri.fromString(s"$baseUrl/orders/limit-order?figi=${figi}")
-      )
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/limit-order?figi=${figi}"))
       req = Request[F]()
         .putHeaders(
-          Authorization(Credentials.Token(AuthScheme.Bearer, "tinvest_token")),
+          Authorization(Credentials.Token(AuthScheme.Bearer, token)),
           Accept(MediaType.application.json))
         .withMethod(Method.POST)
         .withEntity(request)
