@@ -6,13 +6,13 @@ import cats.implicits._
 import github.ainr.tinvest4s.models.{MarketInstrumentListResponse, TInvestError}
 import github.ainr.tinvest4s.models.portfolio.Portfolio
 import github.ainr.tinvest4s.models.orders.{LimitOrderRequest, MarketOrderRequest, OrderResponse}
-import io.circe.generic.auto.exportDecoder
-//import io.circe.generic.auto.{exportDecoder, exportEncoder}
+import io.circe.generic.auto._
+import org.http4s.Status.Successful
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
-//import org.http4s.circe.jsonOf
 import org.http4s.client.Client
 import org.http4s.headers.{Accept, Authorization}
 import org.http4s._
+import org.http4s.circe._
 
 
 class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
@@ -24,73 +24,79 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
   private val baseUrl: String = "https://api-invest.tinkoff.ru/openapi/sandbox"
   private val auth = Authorization(Credentials.Token(AuthScheme.Bearer, token))
   private val mediaTypeJson = Accept(MediaType.application.json)
+  private val baseRequest = Request[F]().putHeaders(auth, mediaTypeJson)
 
-  override def getPortfolio: F[Either[String, Portfolio]] = {
+  override def getPortfolio: F[Either[TInvestError, Portfolio]] = {
     for {
       uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/portfolio"))
       result <- client run {
-        Request[F]()
-          .putHeaders(auth, mediaTypeJson)
+        baseRequest
           .withMethod(Method.GET)
           .withUri(uri)
       } use {
-        case Status.Successful(response) => response.attemptAs[Portfolio].leftMap(_.message).value
-        case error => error.as[String].map(body => {
-          val msg: Either[String, Portfolio] = Left(s"Request failed with status ${error.status.code} and body $body")
-          msg
-        })
+        case Successful(resp) => resp.as[Portfolio].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[Portfolio])
       }
     } yield result
   }
 
-  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[String, OrderResponse]] = {
-    /*
+  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[TInvestError, OrderResponse]] = {
     for {
       uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/limit-order?figi=${figi}"))
-      res <- client.expect(
-        Request[F]()
-          .putHeaders(auth, mediaTypeJson)
+      result <- client.run(
+        baseRequest
           .withMethod(Method.POST)
           .withEntity(request)
           .withUri(uri)
-      )(jsonOf[F, OrderResponse])
-    } yield Either.right(res)*/
-    ???
-  }
-
-  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[String, OrderResponse]] = ???
-
-  private def getMarketInstrumentList(instrument: String): F[Either[String, MarketInstrumentListResponse]] = {
-    for {
-      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/market/$instrument"))
-      result <- client run {
-        Request[F]()
-          .putHeaders(auth, mediaTypeJson)
-          .withMethod(Method.GET)
-          .withUri(uri)
-      } use {
-        case Status.Successful(response) => response.attemptAs[MarketInstrumentListResponse].leftMap(_.message).value
-        case error => error.as[String].map(body => {
-          val msg: Either[String, MarketInstrumentListResponse] = Left(s"Request failed with status ${error.status.code} and body $body")
-          msg
-        })
+        ) use {
+          case Successful(resp) => resp.as[OrderResponse].map(Right(_).withLeft[TInvestError])
+          case error => error.as[TInvestError].map(Left(_).withRight[OrderResponse])
       }
     } yield result
   }
 
-  override def stocks(): F[Either[String, MarketInstrumentListResponse]] = {
+  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[TInvestError, OrderResponse]] = {
+    for {
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/market-order?figi=${figi}"))
+      result <- client run {
+        baseRequest
+          .withMethod(Method.POST)
+          .withEntity(request)
+          .withUri(uri)
+      } use {
+        case Successful(resp) => resp.as[OrderResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[OrderResponse])
+      }
+    } yield result
+  }
+
+  private def getMarketInstrumentList(instrument: String): F[Either[TInvestError, MarketInstrumentListResponse]] = {
+    for {
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/market/$instrument"))
+      result <- client run {
+        baseRequest
+          .withMethod(Method.GET)
+          .withUri(uri)
+      } use {
+        case Successful(resp) => resp.as[MarketInstrumentListResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[MarketInstrumentListResponse])
+      }
+    } yield result
+  }
+
+  override def stocks(): F[Either[TInvestError, MarketInstrumentListResponse]] = {
     getMarketInstrumentList("currencies")
   }
 
-  override def bonds(): F[Either[String, MarketInstrumentListResponse]] = {
+  override def bonds(): F[Either[TInvestError, MarketInstrumentListResponse]] = {
     getMarketInstrumentList("currencies")
   }
 
-  override def etfs(): F[Either[String, MarketInstrumentListResponse]] = {
+  override def etfs(): F[Either[TInvestError, MarketInstrumentListResponse]] = {
     getMarketInstrumentList("etfs")
   }
 
-  override def currencies(): F[Either[String, MarketInstrumentListResponse]] = {
+  override def currencies(): F[Either[TInvestError, MarketInstrumentListResponse]] = {
     getMarketInstrumentList("currencies")
   }
 }

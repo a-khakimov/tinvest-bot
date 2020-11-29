@@ -27,6 +27,7 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
+  "io.circe" %% "circe-literal" % circeVersion,
   "io.circe" %% "circe-generic-extras" % circeVersion,
   "io.github.apimorphism" %% "telegramium-core" % telegramiumVersion,
   "io.github.apimorphism" %% "telegramium-high" % telegramiumVersion,
