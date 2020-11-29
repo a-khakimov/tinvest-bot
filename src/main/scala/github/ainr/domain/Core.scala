@@ -41,21 +41,52 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield msg
   }
 
-  def helpMsg(): F[String] = {
-    s"""
-       |Commands:
-       |/help
-       |/portfolio
-       |""".stripMargin.pure[F]
+  def marketInstrumentMsg(instrument: String): F[String] = {
+    for {
+      currencies <- instrument match {
+        case "stocks" => tinvestRestApi.stocks()
+        case "bonds" => tinvestRestApi.bonds()
+        case "etfs" => tinvestRestApi.etfs()
+        case "currencies" => tinvestRestApi.currencies()
+      }
+      _ <- Sync[F].delay(log.info(currencies.toString))
+      msg <- currencies match {
+        case Right(p) => s"${p.payload.instruments.map {
+            pos => {
+              s"`${pos.figi} ${pos.name}`"
+            }
+          }.mkString("\n")
+        }".pure[F]
+        case Left(e) => s"Error: ${e}".pure[F]
+      }
+    } yield msg
   }
 
   def handleTgMessage(text: String): F[String] = {
     for {
       reply <- text match {
-        case "/portfolio" => portfolioMsg()
         case "/help" => helpMsg()
+        case "/portfolio" => portfolioMsg()
+        case "/stocks" => marketInstrumentMsg("stocks") /* TODO: слишком длинное сообщение */
+        case "/bonds" => marketInstrumentMsg("bonds") /* TODO: слишком длинное сообщение */
+        case "/etfs" => marketInstrumentMsg("etfs")
+        case "/currencies" => marketInstrumentMsg("currencies")
         case _ => helpMsg()
       }
     } yield reply
+  }
+
+  def helpMsg(): F[String] = {
+    s"""
+       |Commands:
+       |/help
+       |/portfolio
+       |/etfs
+       |/currencies
+       |""".stripMargin.pure[F]
+    /*
+    * - /stocks
+    * - /bonds
+    */
   }
 }
