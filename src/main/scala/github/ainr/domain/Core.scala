@@ -7,6 +7,7 @@ import scala.concurrent.duration.DurationInt
 import org.slf4j.LoggerFactory
 import fs2.Stream
 import github.ainr.db.DbAccess
+import github.ainr.tinvest4s.models.portfolio.ExpectedYield
 import github.ainr.tinvest4s.rest.client.TInvestApiHttp4s
 
 class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
@@ -25,12 +26,18 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
 
   def portfolioMsg(): F[String] = {
     for {
-      portfolio <- tinvestRestApi.getPortfolio()
-      msg <- s"${portfolio.payload.positions.map {
-        pos =>
-          s"${pos.name}: figi ${pos.figi}, balance ${pos.balance}, lots ${pos.lots}"
-        }.mkString("\n")
-      }".pure[F]
+      portfolio <- tinvestRestApi.getPortfolio
+      _ <- Sync[F].delay(log.info(portfolio.toString))
+      msg <- portfolio match {
+        case Right(p) => s"${p.payload.positions.map {
+          pos => {
+              val ey = pos.expectedYield.getOrElse(ExpectedYield("", 0))
+              s"`${pos.instrumentType} [${pos.name} ${pos.figi} ${ey.value} ${ey.currency}] balance ${pos.balance}, lots ${pos.lots}`"
+            }
+          }.mkString("\n")
+        }".pure[F]
+        case Left(e) => s"Error: ${e}".pure[F]
+      }
     } yield msg
   }
 

@@ -16,12 +16,13 @@ class TInvestBotRoutes[F[_]: Async] extends Http4sDsl[F] {
   private def endpoints(service: TInvestApi[F]): HttpRoutes[F] = routePortfolio(service)
 
   def routePortfolio(service: TInvestApi[F]): HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "portfolio" => {
-      for {
-        portfolio <- service.getPortfolio()
-        resp <- Ok(portfolio.asJson)
-      } yield resp
-    }
+    //case GET -> Root / "portfolio" => {
+    //  for {
+    //    portfolio <- service.getPortfolio
+    //
+    //  } yield portfolio
+    //}
+    ???
   }
 }
 

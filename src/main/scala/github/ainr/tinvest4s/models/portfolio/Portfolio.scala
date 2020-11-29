@@ -1,4 +1,4 @@
-package github.ainr.tinvest4s.rest.portfolio
+package github.ainr.tinvest4s.models.portfolio
 
 
 case class Portfolio(trackingId: String, payload: Payload, status: String)
