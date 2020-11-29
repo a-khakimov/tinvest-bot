@@ -3,16 +3,13 @@ package github.ainr.tinvest4s.rest.client
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
 import cats.implicits._
-import github.ainr.tinvest4s.models.{MarketInstrumentListResponse, TInvestError}
-import github.ainr.tinvest4s.models.portfolio.Portfolio
-import github.ainr.tinvest4s.models.orders.{LimitOrderRequest, MarketOrderRequest, OrderResponse}
+import github.ainr.tinvest4s.models.{EmptyResponse, LimitOrderRequest, MarketInstrumentListResponse, MarketOrderRequest, OrderResponse, PortfolioResponse, TInvestError}
 import io.circe.generic.auto._
 import org.http4s.Status.Successful
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.client.Client
 import org.http4s.headers.{Accept, Authorization}
 import org.http4s._
-import org.http4s.circe._
 
 
 class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
@@ -21,12 +18,12 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
   implicit F: MonadError[F, Throwable]
 ) extends TInvestApi[F] {
 
-  private val baseUrl: String = "https://api-invest.tinkoff.ru/openapi/sandbox"
-  private val auth = Authorization(Credentials.Token(AuthScheme.Bearer, token))
-  private val mediaTypeJson = Accept(MediaType.application.json)
-  private val baseRequest = Request[F]().putHeaders(auth, mediaTypeJson)
+  private lazy val baseUrl: String = "https://api-invest.tinkoff.ru/openapi/sandbox"
+  private lazy val auth = Authorization(Credentials.Token(AuthScheme.Bearer, token))
+  private lazy val mediaTypeJson = Accept(MediaType.application.json)
+  private lazy val baseRequest = Request[F]().putHeaders(auth, mediaTypeJson)
 
-  override def getPortfolio: F[Either[TInvestError, Portfolio]] = {
+  override def getPortfolio: F[Either[TInvestError, PortfolioResponse]] = {
     for {
       uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/portfolio"))
       result <- client run {
@@ -34,8 +31,22 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
           .withMethod(Method.GET)
           .withUri(uri)
       } use {
-        case Successful(resp) => resp.as[Portfolio].map(Right(_).withLeft[TInvestError])
-        case error => error.as[TInvestError].map(Left(_).withRight[Portfolio])
+        case Successful(resp) => resp.as[PortfolioResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[PortfolioResponse])
+      }
+    } yield result
+  }
+
+  override def cancelOrder(orderId: String): F[Either[TInvestError, EmptyResponse]] = {
+    for {
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/cancel?orderId=${orderId}"))
+      result <- client.run(
+        baseRequest
+          .withMethod(Method.POST)
+          .withUri(uri)
+      ) use {
+        case Successful(resp) => resp.as[EmptyResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[EmptyResponse])
       }
     } yield result
   }

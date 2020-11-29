@@ -7,8 +7,7 @@ import scala.concurrent.duration.DurationInt
 import org.slf4j.LoggerFactory
 import fs2.Stream
 import github.ainr.db.DbAccess
-import github.ainr.tinvest4s.models.orders.{LimitOrderRequest, MarketOrderRequest}
-import github.ainr.tinvest4s.models.portfolio.ExpectedYield
+import github.ainr.tinvest4s.models.{LimitOrderRequest, MarketOrderRequest}
 import github.ainr.tinvest4s.rest.client.TInvestApiHttp4s
 
 class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
@@ -30,7 +29,7 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       portfolio <- tinvestRestApi.getPortfolio
       _ <- Sync[F].delay(log.info(portfolio.toString))
       msg <- portfolio match {
-        case Right(p) => s"${p.payload.positions.map {
+        case Right(p) => s"${p.payload.positions.sortBy(_.instrumentType).map {
           pos => s"`${pos.figi} ${pos.instrumentType} [${pos.name}] balance ${pos.balance}, lots ${pos.lots}`"
           }.mkString("\n")
         }".pure[F]
@@ -120,6 +119,17 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
+  def doCancelOrder(args: String): F[String] = {
+    val orderid = args.split('.').last
+    for {
+      result <- tinvestRestApi.cancelOrder(orderid)
+      reply = result match {
+        case Right(r) => s"`Success`"
+        case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+      }
+    } yield reply
+  }
+
   def handleTgMessage(text: String): F[String] = {
     for {
       reply <- text match {
@@ -129,6 +139,7 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case "/bonds" => marketInstrumentMsg("bonds") /* TODO: слишком длинное сообщение */
         case "/etfs" => marketInstrumentMsg("etfs")
         case "/currencies" => marketInstrumentMsg("currencies")
+        case args if args.startsWith("/cancelOrder") => doCancelOrder(args)
         case args if args.startsWith("/limitOrderBuy") => doLimitOrder("Buy", args)
         case args if args.startsWith("/limitOrderSell") => doLimitOrder("Sell", args)
         case args if args.startsWith("/marketOrderBuy") => doMarketOrder("Buy", args)
@@ -145,6 +156,7 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
        |/portfolio
        |/etfs
        |/currencies
+       |/cancelOrder.orderId
        |/limitOrderBuy.figi.lots.price
        |/limitOrderSell.figi.lots.price
        |/marketOrderBuy.figi.lots
