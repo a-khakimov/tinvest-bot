@@ -9,8 +9,8 @@ import github.ainr.db.{DB, DbAccess}
 import github.ainr.domain.Core
 import org.http4s.client.blaze.BlazeClientBuilder
 import github.ainr.telegram.TgBot
-import github.ainr.tinvest4s.rest.client.TInvestApiHttp4s
-import github.ainr.tinvest4s.websocket.client.TInvestWSApiHttp4s
+import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
+import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s}
 import org.http4s.client.Client
 import org.http4s.client.jdkhttpclient.WSConnectionHighLevel
 import org.http4s.{Header, Headers}
@@ -18,7 +18,8 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.slf4j.LoggerFactory
 import telegramium.bots.high.{Api, BotApi}
 
-// https://hackernoon.com/composable-resource-management-in-scala-0g7b3y5u
+// Composable Resource Management in Scala: https://hackernoon.com/composable-resource-management-in-scala-0g7b3y5u
+// Circular dependency in Scala: https://stackoverflow.com/questions/37037550/circular-dependency-in-scala
 
 object Main extends IOApp {
 
@@ -33,8 +34,8 @@ object Main extends IOApp {
       _ <- resources(config).use {
         case (httpClient, blocker, wsClient, transactor) => {
           implicit val tgBotApi: Api[F] = new BotApi[IO](httpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
-          implicit val tinvestApi: TInvestApiHttp4s[F] = new TInvestApiHttp4s[IO](httpClient, config.tinkoffInvestApiToken)
-          implicit val tinvestWSApi: TInvestWSApiHttp4s[F] = new TInvestWSApiHttp4s[IO](wsClient)
+          implicit val tinvestApi: TInvestApi[F] = new TInvestApiHttp4s[IO](httpClient, config.tinkoffInvestApiToken)
+          implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[IO](wsClient)
           implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
           implicit val core: Core[F] = new Core[F]()
           implicit val tgBot: TgBot[F] = new TgBot[F]()
@@ -42,8 +43,7 @@ object Main extends IOApp {
           for {
             names <- dbAccess.getByID(1)
             _ <- IO { println(names) }
-            //_ <- tinvestWSApi.subscribeCandle("BBG009S39JX6", "1min")
-            //_ <- tinvestWSApi.unsubscribeCandle("BBG009S39JX6", "1min")
+            _ <- tinvestWSApi.subscribeCandle("BBG009S39JX6", "1min")
 
             tinvestWsApiFiber <- tinvestWSApi.listen().start
             tgBotFiber <- tgBot.start().start

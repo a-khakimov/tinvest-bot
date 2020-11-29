@@ -4,12 +4,13 @@ ThisBuild / organization := "github.ainr"
 
 scalaVersion := "2.13.4"
 
-val catsVersion = "2.1.4"
-val circeVersion = "0.13.0"
-val http4sVersion = "0.21.7"
-val doobieVersion = "0.9.0"
-val telegramiumVersion = "2.49.0"
-val pureConfigVersion = "0.13.0"
+lazy val catsVersion = "2.1.4"
+lazy val circeVersion = "0.13.0"
+lazy val http4sVersion = "0.21.7"
+lazy val doobieVersion = "0.9.0"
+lazy val telegramiumVersion = "2.49.0"
+lazy val pureConfigVersion = "0.13.0"
+//autoCompilerPlugins := true
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.0",
@@ -32,7 +33,8 @@ libraryDependencies ++= Seq(
   "io.github.apimorphism" %% "telegramium-core" % telegramiumVersion,
   "io.github.apimorphism" %% "telegramium-high" % telegramiumVersion,
   "com.github.pureconfig" %% "pureconfig" % pureConfigVersion,
-  "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
+  "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime,
+  //"com.lihaoyi" %% "acyclic" % "0.2.0" % "provided",
 )
 
 scalacOptions ++= Seq(
@@ -41,3 +43,4 @@ scalacOptions ++= Seq(
 )
 
 addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.1" cross CrossVersion.full)
+//addCompilerPlugin("com.lihaoyi" %% "acyclic" % "0.2.0")

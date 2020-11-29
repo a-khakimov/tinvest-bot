@@ -45,4 +45,12 @@ StopLoss, TakeProfit для инвестиций
 
 Для выполнения действий и получения информации можно использовать следующие команды
 
-*  [ ] `/portfolio` - посмотреть портфель
+*  [x] `/portfolio` - Портфель
+*  [x] `/etfs` - Получение списка ETF
+*  [x] `/currencies` - Получение списка валютных пар
+*  [x] `/orderbook.figi.depth` - Получение стакана по FIGI
+*  [x] `/cancelOrder.orderId` - Отмена заявки по OrderId
+*  [x] `/limitOrderBuy.figi.lots.price` - Создание лимитной заявки на покупку
+*  [x] `/limitOrderSell.figi.lots.price` - Создание лимитной заявки на продажу
+*  [x] `/marketOrderBuy.figi.lots` - Создание рыночной заявки на покупку
+*  [x] `/marketOrderSell.figi.lots` - Создание рыночной заявки на продажу

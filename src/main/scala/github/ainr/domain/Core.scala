@@ -7,11 +7,14 @@ import scala.concurrent.duration.DurationInt
 import org.slf4j.LoggerFactory
 import fs2.Stream
 import github.ainr.db.DbAccess
+import github.ainr.telegram.TgBot
 import github.ainr.tinvest4s.models.{LimitOrderRequest, MarketOrderRequest}
-import github.ainr.tinvest4s.rest.client.TInvestApiHttp4s
+import github.ainr.tinvest4s.rest.client.TInvestApi
+import github.ainr.tinvest4s.websocket.client.TInvestWSApi
 
 class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
-                               implicit val tinvestRestApi: TInvestApiHttp4s[F]) {
+                               implicit val tinvestRestApi: TInvestApi[F],
+                               implicit val tinvestWSApi: TInvestWSApi[F]) {
 
   private val log = LoggerFactory.getLogger("Core")
 
@@ -186,19 +189,26 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield reply
   }
 
+  def tinvestWSHandler(x: String): F[Unit] = {
+    //tgBot.send(174861972, s"`$x`")
+    for {
+      _ <- Sync[F].delay(log.info(s"`$x`"))
+    } yield ()
+  }
+
   def helpMsg(): F[String] = {
     s"""
-       |Commands:
+       |Список доступных команд:
        |/help
-       |/portfolio
-       |/etfs
-       |/currencies
-       |/orderbook.figi.depth
-       |/cancelOrder.orderId
-       |/limitOrderBuy.figi.lots.price
-       |/limitOrderSell.figi.lots.price
-       |/marketOrderBuy.figi.lots
-       |/marketOrderSell.figi.lots
+       |/portfolio - Портфель
+       |/etfs - Получение списка ETF
+       |/currencies - Получение списка валютных пар
+       |/orderbook.figi.depth - Получение стакана по FIGI
+       |/cancelOrder.orderId - Отмена заявки по OrderId
+       |/limitOrderBuy.figi.lots.price - Создание лимитной заявки на покупку
+       |/limitOrderSell.figi.lots.price - Создание лимитной заявки на продажу
+       |/marketOrderBuy.figi.lots - Создание рыночной заявки на покупку
+       |/marketOrderSell.figi.lots - Создание рыночной заявки на продажу
        |""".stripMargin.pure[F]
     /*
     * - /stocks

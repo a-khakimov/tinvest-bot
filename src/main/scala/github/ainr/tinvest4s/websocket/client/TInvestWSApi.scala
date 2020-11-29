@@ -1,11 +1,11 @@
 package github.ainr.tinvest4s.websocket.client
 
 import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Timer}
-import github.ainr.tinvest4s.websocket.request.{CandleRequest, InstrumentInfoRequest, OrderBookRequest, TInvestWSRequest}
+import github.ainr.tinvest4s.websocket.request.{CandleRequest, InstrumentInfoRequest, OrderBookRequest}
 import github.ainr.tinvest4s.websocket.response.{CandleResponse, InstrumentInfoResponse, OrderBookResponse, TInvestWSResponse}
 import io.circe.syntax.EncoderOps
 import cats.syntax.functor._
-import io.circe.{Decoder, jawn}
+import io.circe.{Decoder}
 import io.circe.generic.auto._
 import org.http4s.client.jdkhttpclient.{WSConnectionHighLevel, WSFrame}
 
@@ -18,10 +18,14 @@ trait TInvestWSApi[F[_]] {
   def unsubscribeCandle(figi: String, interval: String): F[Unit]
   def unsubscribeOrderbook(figi: String, depth: Int): F[Unit]
   def unsubscribeInstrumentInfo(figi: String): F[Unit]
+
+  def listen(): F[List[String]]
 }
 
 
-class TInvestWSApiHttp4s[F[_] : ConcurrentEffect: Timer: ContextShift : Concurrent](connection: WSConnectionHighLevel[F]) extends TInvestWSApi[F] {
+class TInvestWSApiHttp4s[F[_] : ConcurrentEffect: Timer: ContextShift : Concurrent]
+(connection: WSConnectionHighLevel[F])
+  extends TInvestWSApi[F] {
 
   override def subscribeCandle(figi: String, interval: String): F[Unit] = {
     connection.send {
@@ -71,18 +75,17 @@ class TInvestWSApiHttp4s[F[_] : ConcurrentEffect: Timer: ContextShift : Concurre
       }
   }
 
-  def listen() = {
+  def listen(): F[List[String]] = {
     connection
       .receiveStream
-      .collect { case WSFrame.Text(str, _) => handle(str) }
+      .collect { case WSFrame.Text(str, _) => {
+          //handler(str)
+          str
+        }
+      }
       .evalTap(_ => connection.sendPing())
       .compile
       .toList
-  }
-
-  def handle(str: String): Unit = {
-    println(str)
-    println(jawn.decode[TInvestWSResponse](str))
   }
 
   implicit val decodeEvent: Decoder[TInvestWSResponse] =
