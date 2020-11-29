@@ -3,7 +3,7 @@ package github.ainr.tinvest4s.models
 case class MarketOrderRequest(lots: Int, operation: String)
 case class LimitOrderRequest(lots: Int, operation: String, price: Double)
 
-case class OrderResponse(trackingId: String, status: String, payload: PlacedLimitOrder)
+case class OrdersResponse(trackingId: String, status: String, payload: PlacedLimitOrder)
 
 case class PlacedLimitOrder(orderId: String,
                             operation: String, /* Buy, Sell */

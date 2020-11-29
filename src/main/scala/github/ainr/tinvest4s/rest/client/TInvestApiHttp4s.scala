@@ -3,7 +3,7 @@ package github.ainr.tinvest4s.rest.client
 import cats.MonadError
 import cats.effect.{ConcurrentEffect, ContextShift}
 import cats.implicits._
-import github.ainr.tinvest4s.models.{EmptyResponse, LimitOrderRequest, MarketInstrumentListResponse, MarketOrderRequest, OrderResponse, PortfolioResponse, TInvestError}
+import github.ainr.tinvest4s.models.{EmptyResponse, LimitOrderRequest, MarketInstrumentListResponse, MarketOrderRequest, OrderbookResponse, OrdersResponse, PortfolioResponse, TInvestError}
 import io.circe.generic.auto._
 import org.http4s.Status.Successful
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
@@ -51,7 +51,7 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
     } yield result
   }
 
-  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[TInvestError, OrderResponse]] = {
+  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[TInvestError, OrdersResponse]] = {
     for {
       uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/limit-order?figi=${figi}"))
       result <- client.run(
@@ -60,13 +60,13 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
           .withEntity(request)
           .withUri(uri)
         ) use {
-          case Successful(resp) => resp.as[OrderResponse].map(Right(_).withLeft[TInvestError])
-          case error => error.as[TInvestError].map(Left(_).withRight[OrderResponse])
+          case Successful(resp) => resp.as[OrdersResponse].map(Right(_).withLeft[TInvestError])
+          case error => error.as[TInvestError].map(Left(_).withRight[OrdersResponse])
       }
     } yield result
   }
 
-  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[TInvestError, OrderResponse]] = {
+  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[TInvestError, OrdersResponse]] = {
     for {
       uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/orders/market-order?figi=${figi}"))
       result <- client run {
@@ -75,8 +75,8 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
           .withEntity(request)
           .withUri(uri)
       } use {
-        case Successful(resp) => resp.as[OrderResponse].map(Right(_).withLeft[TInvestError])
-        case error => error.as[TInvestError].map(Left(_).withRight[OrderResponse])
+        case Successful(resp) => resp.as[OrdersResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[OrdersResponse])
       }
     } yield result
   }
@@ -109,6 +109,20 @@ class TInvestApiHttp4s[F[_] : ConcurrentEffect: ContextShift](client: Client[F],
 
   override def currencies(): F[Either[TInvestError, MarketInstrumentListResponse]] = {
     getMarketInstrumentList("currencies")
+  }
+
+  override def orderbook(figi: String, depth: Int): F[Either[TInvestError, OrderbookResponse]] = {
+    for {
+      uri <- F.fromEither[Uri](Uri.fromString(s"$baseUrl/market/orderbook?figi=$figi&depth=$depth"))
+      result <- client run {
+        baseRequest
+          .withMethod(Method.GET)
+          .withUri(uri)
+      } use {
+        case Successful(resp) => resp.as[OrderbookResponse].map(Right(_).withLeft[TInvestError])
+        case error => error.as[TInvestError].map(Left(_).withRight[OrderbookResponse])
+      }
+    } yield result
   }
 }
 

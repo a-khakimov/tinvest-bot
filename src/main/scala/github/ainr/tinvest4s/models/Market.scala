@@ -14,3 +14,17 @@ case class MarketInstrument(figi: String,
                             currency: Option[String],
                             name: String,
                             `type`: String)
+
+case class OrderbookResponse(trackingId: String, status: String, payload: Orderbook)
+case class Orderbook(figi: String,
+                     depth: Int,
+                     bids: List[OrderResponse],
+                     asks: List[OrderResponse],
+                     tradeStatus: String,
+                     minPriceIncrement: Double, // Шаг цены
+                     faceValue: Option[Double], // Номинал для облигаций
+                     lastPrice: Option[Double],
+                     closePrice: Option[Double],
+                     limitUp: Option[Double],   // Верхняя граница цены
+                     limitDown: Option[Double]) // Нижняя граница цены
+case class OrderResponse(price: Double, quantity: Int)

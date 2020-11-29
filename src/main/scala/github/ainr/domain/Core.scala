@@ -130,6 +130,42 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield reply
   }
 
+  def parseOrderbookArgs(text: String): Option[(Int, String)] = {
+    val args = text.filter(c => c != '/' || c != ' ').split('.')
+    args.size match {
+      case 3 => {
+        val figi = args(1)
+        args(2).toIntOption match {
+          case depth if depth.isDefined => Some(depth.get, figi)
+          case _ => None
+        }
+      }
+      case _ => None
+    }
+  }
+
+  def doOrderbook(args: String): F[String] = {
+    val parsedArgs = parseMarketOrderArgs(args)
+    parsedArgs match {
+      case None => s"Wrong command".pure[F]
+      case Some(args: (Int, String)) =>
+        val (depth, figi) = args
+        for {
+          result <- tinvestRestApi.orderbook(figi, depth)
+          reply = result match {
+            case Right(ordbook) => s"""|`lastPrice:${ordbook.payload.lastPrice.getOrElse(0)}`
+                                       |`closePrice:${ordbook.payload.closePrice.getOrElse(0)}`
+                                       |`limitUp:${ordbook.payload.limitUp.getOrElse(0)}`
+                                       |`limitDown:${ordbook.payload.limitDown.getOrElse(0)}`
+                                       |`bids:${ordbook.payload.bids.map(b => s"(${b.price} ${b.quantity})").mkString(",")}`
+                                       |`asks:${ordbook.payload.asks.map(a => s"(${a.price} ${a.quantity})").mkString(",")}`
+                                       |""".stripMargin
+            case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+          }
+        } yield reply
+    }
+  }
+
   def handleTgMessage(text: String): F[String] = {
     for {
       reply <- text match {
@@ -139,6 +175,7 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case "/bonds" => marketInstrumentMsg("bonds") /* TODO: слишком длинное сообщение */
         case "/etfs" => marketInstrumentMsg("etfs")
         case "/currencies" => marketInstrumentMsg("currencies")
+        case args if args.startsWith("/orderbook") => doOrderbook(args)
         case args if args.startsWith("/cancelOrder") => doCancelOrder(args)
         case args if args.startsWith("/limitOrderBuy") => doLimitOrder("Buy", args)
         case args if args.startsWith("/limitOrderSell") => doLimitOrder("Sell", args)
@@ -156,6 +193,7 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
        |/portfolio
        |/etfs
        |/currencies
+       |/orderbook.figi.depth
        |/cancelOrder.orderId
        |/limitOrderBuy.figi.lots.price
        |/limitOrderSell.figi.lots.price
