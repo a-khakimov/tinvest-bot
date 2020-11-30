@@ -26,6 +26,10 @@ StopLoss, TakeProfit для инвестиций
 * Выполнять заявки для покупки или продажи акций по значениям StopLoss и TakeProfit
 * Уведомлять пользователя через telegram о выполняемых действиях
 
+# Дополнительно
+
+Модуль **tinvest4s** для работы с [api тинькофф инвестиций](https://tinkoffcreditsystems.github.io/invest-openapi/) переехал в отдельный репозиторий [tinvest4s](https://github.com/a-khakimov/tinvest4s)
+
 # Функциональность
 
 И так... Тут нужно подумать!
@@ -54,3 +58,4 @@ StopLoss, TakeProfit для инвестиций
 *  [x] `/limitOrderSell.figi.lots.price` - Создание лимитной заявки на продажу
 *  [x] `/marketOrderBuy.figi.lots` - Создание рыночной заявки на покупку
 *  [x] `/marketOrderSell.figi.lots` - Создание рыночной заявки на продажу
+
