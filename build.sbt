@@ -4,6 +4,10 @@ ThisBuild / organization := "github.ainr"
 
 scalaVersion := "2.13.4"
 
+//lazy val tinvest4s = ProjectRef(file("../tinvest4s/"), "tinvest4s")
+lazy val tinvest4s = ProjectRef(uri("https://github.com/a-khakimov/tinvest4s.git#main"), "tinvest4s")
+lazy val root = (project in file(".")).dependsOn(tinvest4s)
+
 lazy val catsVersion = "2.1.4"
 lazy val circeVersion = "0.13.0"
 lazy val http4sVersion = "0.21.7"
