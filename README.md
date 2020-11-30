@@ -26,11 +26,7 @@ StopLoss, TakeProfit для инвестиций
 * Выполнять заявки для покупки или продажи акций по значениям StopLoss и TakeProfit
 * Уведомлять пользователя через telegram о выполняемых действиях
 
-# Дополнительно
-
-Модуль **tinvest4s** для работы с [api тинькофф инвестиций](https://tinkoffcreditsystems.github.io/invest-openapi/) переехал в отдельный репозиторий [tinvest4s](https://github.com/a-khakimov/tinvest4s)
-
-# Функциональность
+## Функциональность
 
 И так... Тут нужно подумать!
 
@@ -40,7 +36,7 @@ StopLoss, TakeProfit для инвестиций
 
 На данном этапе можно реализовать StopLoss и TakeProfit для торговли в лонг. В таком случае, события событие StopLoss будет происходить при падении стоимости акции до заданного уровня и, соответственно, событие TakeProfit будет происходить при росте стоимости акции до заданного уровня.
 
-# Взаимодействие с пользователем
+## Взаимодействие с пользователем
 
 Для взаимодействия с пользователем можно рассмотреть два варианта:
 * Первый способ взаимодействия можно сделать через http-api
@@ -50,18 +46,28 @@ StopLoss, TakeProfit для инвестиций
 
 ## Взаимодействие через telegram
 
-Базовые команды:
+### Базовые команды
 
-*  [x] `/portfolio` - Портфель
-*  [x] `/etfs` - Получение списка ETF
-*  [x] `/currencies` - Получение списка валютных пар
-*  [x] `/orderbook.figi.depth` - Получение стакана по FIGI
-*  [x] `/cancelOrder.orderId` - Отмена заявки по OrderId
-*  [x] `/limitOrderBuy.figi.lots.price` - Создание лимитной заявки на покупку
-*  [x] `/limitOrderSell.figi.lots.price` - Создание лимитной заявки на продажу
-*  [x] `/marketOrderBuy.figi.lots` - Создание рыночной заявки на покупку
-*  [x] `/marketOrderSell.figi.lots` - Создание рыночной заявки на продажу
+* [x] `/portfolio` - Портфель
+* [x] `/etfs` - Получение списка ETF
+* [x] `/currencies` - Получение списка валютных пар
+* [x] `/orderbook.figi.depth` - Получение стакана по FIGI
+* [x] `/cancelOrder.orderId` - Отмена заявки по OrderId
+* [x] `/limitOrderBuy.figi.lots.price` - Создание лимитной заявки на покупку
+* [x] `/limitOrderSell.figi.lots.price` - Создание лимитной заявки на продажу
+* [x] `/marketOrderBuy.figi.lots` - Создание рыночной заявки на покупку
+* [x] `/marketOrderSell.figi.lots` - Создание рыночной заявки на продажу
 
-Рыночная заявка на покупку с указанными значениями `stoploss` и `takeprofit`:
+### Более сложные команды
 
-*  [ ] `/marketOrderBuy.figi.lots.stoploss.takeprofit`
+* [ ] `/marketOrderBuy.figi.lots.stoploss.takeprofit` - Создание рыночной заявки на покупку с указанными значениями `stoploss` и `takeprofit`. `stoploss` и `takeprofit` имеют тип `Double`. Например, команда `/marketOrderBuy.BBG009S39JX6.10.100,01.200,02` выполнит покупку 10 лотов акций `BBG009S39JX6` со значением `stoploss=10.100` и `takeprofit=200,02`. При этом значение stoploss не должна превышать значение текущей стоимости акции и, соответственно, значение `takeprofit` должна превышать текущую стоимость акции. Команда вернет информацию о покупке и id операции.   
+* [ ] `/aciveOrders` - Получить список активных операций
+* [ ] `/completedOrders` - Получить список последних завершенных операций
+* [ ] `/stopOrder.id` - Отменить операцию по id
+* [ ] `/stopAllOrders` - Отменить все активные операции 
+
+Под операцией подразумевается процесс подписки на отслеживание стоимости акции по `figi`, которая завершится по достижению значений `stoploss` и `takeprofit` или по команде `stop`.
+
+## Дополнительно
+
+Модуль **tinvest4s** для работы с [api тинькофф инвестиций](https://tinkoffcreditsystems.github.io/invest-openapi/) переехал в отдельный репозиторий [tinvest4s](https://github.com/a-khakimov/tinvest4s)
