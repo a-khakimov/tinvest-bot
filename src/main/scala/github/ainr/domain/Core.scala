@@ -1,20 +1,17 @@
 package github.ainr.domain
 
-import cats.implicits._
 import cats.effect.{Sync, Timer}
-
-import scala.concurrent.duration.DurationInt
-import org.slf4j.LoggerFactory
+import cats.implicits._
 import fs2.Stream
 import github.ainr.db.DbAccess
-import github.ainr.telegram.TgBot
 import github.ainr.tinvest4s.models.{LimitOrderRequest, MarketOrderRequest}
 import github.ainr.tinvest4s.rest.client.TInvestApi
-import github.ainr.tinvest4s.websocket.client.TInvestWSApi
+import org.slf4j.LoggerFactory
+
+import scala.concurrent.duration.DurationInt
 
 class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
-                               implicit val tinvestRestApi: TInvestApi[F],
-                               implicit val tinvestWSApi: TInvestWSApi[F]) {
+                               implicit val tinvestRestApi: TInvestApi[F]) {
 
   private val log = LoggerFactory.getLogger("Core")
 
