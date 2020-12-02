@@ -6,22 +6,47 @@ import fs2.Stream
 import github.ainr.db.DbAccess
 import github.ainr.tinvest4s.models.{LimitOrderRequest, MarketOrderRequest}
 import github.ainr.tinvest4s.rest.client.TInvestApi
+import github.ainr.tinvest4s.websocket.response.{CandlePayload, CandleResponse, InstrumentInfoPayload, OrderBookPayload}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
 
-class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
-                               implicit val tinvestRestApi: TInvestApi[F]) {
+
+trait Core[F[_]] {
+  def start: F[Unit]
+  def handleTgMessage(text: String): F[String]
+  def candleHandler(candle: CandlePayload): F[Unit]
+  def orderBookHandler(orderBook: OrderBookPayload): F[Unit]
+  def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit]
+}
+
+class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
+                                   implicit val tinvestRestApi: TInvestApi[F]) extends Core[F] {
 
   private val log = LoggerFactory.getLogger("Core")
 
-  def start: F[Unit] = {
+  override def start: F[Unit] = {
     (Stream.emit(()) ++ Stream.fixedRate[F](5.second))
       .evalTap { _ =>
         for {
           _ <- Sync[F].delay(log.info("Some actions..."))
         } yield ()
       }.compile.drain
+  }
+
+  override def candleHandler(candle: CandlePayload): F[Unit] = {
+    for {
+      _ <- dbAccess.insertCandle(candle)
+      _ <- Sync[F].delay(log.info(s"CandleHandler: $candle"))
+    } yield ()
+  }
+
+  override def orderBookHandler(orderbook: OrderBookPayload): F[Unit] = {
+    ???
+  }
+
+  override def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit] = {
+    ???
   }
 
   def portfolioMsg(): F[String] = {
@@ -166,7 +191,44 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def handleTgMessage(text: String): F[String] = {
+  def parseSmartMarketOrderBuyArgs(text: String): Option[(String, Int, Double, Double)] = {
+    val args = text.filter(c => c != '/' || c != ' ').split('.')
+    args.size match {
+      case 5 => {
+        val figi = args(1)
+        (args(2).toIntOption, args(3).toDoubleOption, args(4).toDoubleOption) match {
+          case (lots, sloss, tprofit) if lots.isDefined && sloss.isDefined && tprofit.isDefined => {
+            Some(figi, lots.get, sloss.get, tprofit.get)
+          }
+          case _ => None
+        }
+      }
+      case _ => None
+    }
+  }
+
+  def doSmartMarketOrderBuy(args: String): F[String] = {
+    // figi.lots.stoploss.takeprofit
+    val parsedArgs = parseSmartMarketOrderBuyArgs(args)
+    parsedArgs match {
+      case None => s"Wrong command".pure[F]
+      case Some(args: (String, Int, Double, Double)) => {
+        val (figi, lots, stoploss, takeprofit) = args
+        for {
+          orderbookE <- tinvestRestApi.orderbook(figi, 1)
+          _ <- orderbookE match {
+            case Left(e) => s"${e.status}: ${e.payload.message.getOrElse("Unknown")}".pure[F]
+            case Right(orderbook) => {
+              // orderbook.payload
+              ???
+            }
+          }
+        } yield ()
+      }
+    }
+  }
+
+  override def handleTgMessage(text: String): F[String] = {
     for {
       reply <- text match {
         case "/help" => helpMsg()
@@ -181,16 +243,10 @@ class Core[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case args if args.startsWith("/limitOrderSell") => doLimitOrder("Sell", args)
         case args if args.startsWith("/marketOrderBuy") => doMarketOrder("Buy", args)
         case args if args.startsWith("/marketOrderSell") => doMarketOrder("Sell", args)
+        case args if args.startsWith("/smartMarketOrderBuy") => ??? // figi.lots.stoploss.takeprofit
         case _ => helpMsg()
       }
     } yield reply
-  }
-
-  def tinvestWSHandler(x: String): F[Unit] = {
-    //tgBot.send(174861972, s"`$x`")
-    for {
-      _ <- Sync[F].delay(log.info(s"`$x`"))
-    } yield ()
   }
 
   def helpMsg(): F[String] = {

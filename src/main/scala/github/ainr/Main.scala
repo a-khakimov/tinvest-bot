@@ -6,8 +6,8 @@ import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import github.ainr.config.Config
 import github.ainr.db.{DB, DbAccess}
-import github.ainr.domain.Core
-import github.ainr.telegram.TgBot
+import github.ainr.domain.{Core, CoreImpl}
+import github.ainr.telegram.{TgBot}
 import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
 import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s, TInvestWSHandler}
 import github.ainr.tinvest4s.websocket.response.{CandleResponse, InstrumentInfoResponse, OrderBookResponse, TInvestWSResponse}
@@ -23,17 +23,14 @@ import telegramium.bots.high.{Api, BotApi}
 // Circular dependency in Scala: https://stackoverflow.com/questions/37037550/circular-dependency-in-scala
 
 /* For example */
-class SomeHandler[F[_]: Async : Timer]() extends TInvestWSHandler[F] {
+class SomeHandler[F[_]: Async : Timer](implicit core: Core[F]) extends TInvestWSHandler[F] {
 
   override def handle(response: TInvestWSResponse): F[Unit] = {
-    val foo = response match {
-      case CandleResponse(event, time, payload) => s"$event: ${payload.figi}"
-      case OrderBookResponse(event, time, payload) => s"$event: ${payload.figi}"
-      case InstrumentInfoResponse(event, time, payload) => s"$event: ${payload.figi}"
-      case _ => "Error"
+    response match {
+      case CandleResponse(event, time, payload) => core.candleHandler(payload)
+      case OrderBookResponse(event, time, payload) => core.orderBookHandler(payload)
+      //case InstrumentInfoResponse(event, time, payload) => ???
     }
-
-    Sync[F].delay { println(s"$foo") }
   }
 }
 
@@ -51,22 +48,23 @@ object Main extends IOApp {
         case (tgHttpClient, tinvestHttpClient, blocker, wsClient, transactor) => {
           implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
           implicit val tinvestApi: TInvestApi[F] = new TInvestApiHttp4s[F](tinvestHttpClient, config.tinkoffInvestApiToken)
-          implicit val handler: TInvestWSHandler[F] = new SomeHandler[F]()
           implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
-          implicit val core: Core[F] = new Core[F]()
+          implicit val core: Core[F] = new CoreImpl[F]()
+          implicit val handler: TInvestWSHandler[F] = new SomeHandler[F]()
           implicit val tgBot: TgBot[F] = new TgBot[F]()
           implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, handler)
 
           for {
             names <- dbAccess.getByID(1)
             _ <- IO { println(names) }
-            _ <- tinvestWSApi.subscribeCandle("BBG009S39JX6", "1min")
-            _ <- tinvestWSApi.subscribeOrderbook("BBG009S39JX6", 5)
+            _ <- tinvestWSApi.subscribeCandle("BBG00RPRPX12", "1min")
+            _ <- tinvestWSApi.subscribeCandle("BBG005HLSZ23", "1min")
+            _ <- tinvestWSApi.subscribeCandle("BBG00PC4M4X3", "1min")
 
             tinvestWsApiFiber <- tinvestWSApi.listen().start
             tgBotFiber <- tgBot.start().start
             _ <- core.start.start.void
-            _ <- tgBotFiber.join
+            //_ <- tgBotFiber.join
             _ <- tinvestWsApiFiber.join
           } yield ()
         }
@@ -76,7 +74,6 @@ object Main extends IOApp {
 
   def resources(config: Config): Resource[F, (Client[F], Client[F], Blocker, WSConnectionHighLevel[F], HikariTransactor[F])] = {
     import java.net.http.HttpClient
-
     import org.http4s.client.jdkhttpclient.{JdkWSClient, WSRequest}
 
     val wsUri = uri"wss://api-invest.tinkoff.ru/openapi/md/v1/md-openapi/ws"
