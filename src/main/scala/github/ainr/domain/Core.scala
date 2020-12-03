@@ -4,9 +4,10 @@ import cats.effect.{Sync, Timer}
 import cats.implicits._
 import fs2.Stream
 import github.ainr.db.DbAccess
-import github.ainr.tinvest4s.models.{LimitOrderRequest, MarketOrderRequest}
+import github.ainr.tinvest4s.models.{CandleResolution, LimitOrderRequest, MarketOrderRequest, Operation}
 import github.ainr.tinvest4s.rest.client.TInvestApi
-import github.ainr.tinvest4s.websocket.response.{CandlePayload, CandleResponse, InstrumentInfoPayload, OrderBookPayload}
+import github.ainr.tinvest4s.websocket.client.TInvestWSApi
+import github.ainr.tinvest4s.websocket.response.{CandlePayload, InstrumentInfoPayload, OrderBookPayload}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
@@ -20,8 +21,9 @@ trait Core[F[_]] {
   def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit]
 }
 
-class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
-                                   implicit val tinvestRestApi: TInvestApi[F]) extends Core[F] {
+class CoreImpl[F[_]: Sync : Timer](dbAccess: DbAccess[F],
+                                   val tinvestRestApi: TInvestApi[F],
+                                   val tinvestWSApi: TInvestWSApi[F]) extends Core[F] {
 
   private val log = LoggerFactory.getLogger("Core")
 
@@ -41,15 +43,11 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield ()
   }
 
-  override def orderBookHandler(orderbook: OrderBookPayload): F[Unit] = {
-    ???
-  }
+  override def orderBookHandler(orderBook: OrderBookPayload): F[Unit] = ???
 
-  override def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit] = {
-    ???
-  }
+  override def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit] = ???
 
-  def portfolioMsg(): F[String] = {
+  private def portfolioMsg(): F[String] = {
     for {
       portfolio <- tinvestRestApi.getPortfolio
       _ <- Sync[F].delay(log.info(portfolio.toString))
@@ -63,7 +61,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield msg
   }
 
-  def marketInstrumentMsg(instrument: String): F[String] = {
+  private def marketInstrumentMsg(instrument: String): F[String] = {
     for {
       currencies <- instrument match {
         case "stocks" => tinvestRestApi.stocks()
@@ -82,7 +80,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield msg
   }
 
-  def parseLimitOrderArgs(text: String): Option[(Int, Double, String)] = {
+  private def parseLimitOrderArgs(text: String): Option[(Int, Double, String)] = {
     val args = text.filter(c => c != '/' || c != ' ').split('.')
     args.size match {
       case 4 => {
@@ -96,7 +94,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def parseMarketOrderArgs(text: String): Option[(Int, String)] = {
+  private def parseMarketOrderArgs(text: String): Option[(Int, String)] = {
     val args = text.filter(c => c != '/' || c != ' ').split('.')
     args.size match {
       case 3 => {
@@ -110,7 +108,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def doLimitOrder(operation: String, text: String): F[String] = {
+  private def doLimitOrder(operation: String, text: String): F[String] = {
     val parsedArgs = parseLimitOrderArgs(text)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -127,7 +125,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def doMarketOrder(operation: String, args: String): F[String] = {
+  private def doMarketOrder(operation: String, args: String): F[String] = {
     val parsedArgs = parseMarketOrderArgs(args)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -144,7 +142,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def doCancelOrder(args: String): F[String] = {
+  private def doCancelOrder(args: String): F[String] = {
     val orderid = args.split('.').last
     for {
       result <- tinvestRestApi.cancelOrder(orderid)
@@ -155,7 +153,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield reply
   }
 
-  def parseOrderbookArgs(text: String): Option[(Int, String)] = {
+  private def parseOrderbookArgs(text: String): Option[(Int, String)] = {
     val args = text.filter(c => c != '/' || c != ' ').split('.')
     args.size match {
       case 3 => {
@@ -169,7 +167,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def doOrderbook(args: String): F[String] = {
+  private def doOrderbook(args: String): F[String] = {
     val parsedArgs = parseMarketOrderArgs(args)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -191,7 +189,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def parseSmartMarketOrderBuyArgs(text: String): Option[(String, Int, Double, Double)] = {
+  private def parseSmartMarketOrderBuyArgs(text: String): Option[(String, Int, Double, Double)] = {
     val args = text.filter(c => c != '/' || c != ' ').split('.')
     args.size match {
       case 5 => {
@@ -207,8 +205,10 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  def doSmartMarketOrderBuy(args: String): F[String] = {
-    // figi.lots.stoploss.takeprofit
+  /*
+  * TODO: упростить!
+  * */
+  private def doSmartMarketOrderBuy(args: String): F[String] = {
     val parsedArgs = parseSmartMarketOrderBuyArgs(args)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -216,14 +216,49 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         val (figi, lots, stoploss, takeprofit) = args
         for {
           orderbookE <- tinvestRestApi.orderbook(figi, 1)
-          _ <- orderbookE match {
+          msg <- orderbookE match {
             case Left(e) => s"${e.status}: ${e.payload.message.getOrElse("Unknown")}".pure[F]
             case Right(orderbook) => {
-              // orderbook.payload
-              ???
+              orderbook.payload.lastPrice match {
+                case None => s"Last price for $figi isn't defined".pure[F]
+                case lastPriceOpt => {
+                  val lastPrice = lastPriceOpt.get
+                  if (lastPrice < stoploss)
+                    s"Значение StopLoss($stoploss) выше чем текущая стоимость акции ($lastPrice)".pure[F]
+                  else if (lastPrice > takeprofit)
+                    s"Значение TakeProfit($takeprofit) ниже чем текущая стоимость акции ($lastPrice)".pure[F]
+                  else {
+                    for {
+                      orderE <- tinvestRestApi.marketOrder(figi, MarketOrderRequest(lots, Operation.Buy))
+                      msg <- orderE match {
+                        case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`".pure[F]
+                        case Right(order) => {
+                          val operation = BotOperation(
+                            None,
+                            figi,
+                            stoploss,
+                            takeprofit,
+                            OperationStatus.Active,
+                            order.payload.orderId,
+                            order.payload.status,
+                            order.payload.operation,
+                            order.payload.requestedLots,
+                            order.payload.executedLots
+                          )
+                          for {
+                            _ <- tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`)
+                            _ <- dbAccess.insertOperation(operation)
+                            msg <- s"Выполнена покупка акций $figi, количество $lots, цена ($lastPrice)".pure[F]
+                          } yield msg
+                        }
+                      }
+                    } yield msg
+                  }
+                }
+              }
             }
           }
-        } yield ()
+        } yield msg
       }
     }
   }
@@ -243,13 +278,13 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case args if args.startsWith("/limitOrderSell") => doLimitOrder("Sell", args)
         case args if args.startsWith("/marketOrderBuy") => doMarketOrder("Buy", args)
         case args if args.startsWith("/marketOrderSell") => doMarketOrder("Sell", args)
-        case args if args.startsWith("/smartMarketOrderBuy") => ??? // figi.lots.stoploss.takeprofit
+        case args if args.startsWith("/smartMarketOrderBuy") => doSmartMarketOrderBuy(args)
         case _ => helpMsg()
       }
     } yield reply
   }
 
-  def helpMsg(): F[String] = {
+  private def helpMsg(): F[String] = {
     s"""
        |Список доступных команд:
        |/help

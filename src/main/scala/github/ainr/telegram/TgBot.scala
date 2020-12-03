@@ -9,7 +9,7 @@ import telegramium.bots.high.implicits._
 import telegramium.bots.high.{Api, LongPollBot, Methods}
 
 
-class TgBot[F[_]: Async : Timer](implicit bot: Api[F], implicit val core: Core[F])
+class TgBot[F[_]: Async : Timer](implicit val bot: Api[F], implicit val core: Core[F])
   extends LongPollBot[F](bot) with TgExtractors {
 
   val log: Logger = LoggerFactory.getLogger("TgBot")
@@ -25,6 +25,21 @@ class TgBot[F[_]: Async : Timer](implicit bot: Api[F], implicit val core: Core[F
       case _ => send(msg.chat.id, "_")
     })
   }
+
+  def send(chatId: Long, text: String): F[Unit] = {
+    Methods
+      .sendMessage(chatId = ChatIntId(chatId), text = text, parseMode = Some(Markdown))
+      .exec
+      .void >> Sync[F].delay {
+      log.info(s"send message[$chatId]: $text")
+    }
+  }
+}
+
+class TgBotNotifier[F[_]: Async : Timer](implicit val bot: Api[F])
+  extends LongPollBot[F](bot) with TgExtractors {
+
+  val log: Logger = LoggerFactory.getLogger("TgBotNotifier")
 
   def send(chatId: Long, text: String): F[Unit] = {
     Methods

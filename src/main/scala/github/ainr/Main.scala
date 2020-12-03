@@ -7,7 +7,7 @@ import doobie.hikari.HikariTransactor
 import github.ainr.config.Config
 import github.ainr.db.{DB, DbAccess}
 import github.ainr.domain.{Core, CoreImpl}
-import github.ainr.telegram.{TgBot}
+import github.ainr.telegram.{TgBot, TgBotNotifier}
 import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
 import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s, TInvestWSHandler}
 import github.ainr.tinvest4s.websocket.response.{CandleResponse, InstrumentInfoResponse, OrderBookResponse, TInvestWSResponse}
@@ -23,16 +23,32 @@ import telegramium.bots.high.{Api, BotApi}
 // Circular dependency in Scala: https://stackoverflow.com/questions/37037550/circular-dependency-in-scala
 
 /* For example */
-class SomeHandler[F[_]: Async : Timer](implicit core: Core[F]) extends TInvestWSHandler[F] {
+class SomeHandler[F[_]: Async : Timer](notifier: Notifier[F]) extends TInvestWSHandler[F] {
 
   override def handle(response: TInvestWSResponse): F[Unit] = {
     response match {
-      case CandleResponse(event, time, payload) => core.candleHandler(payload)
-      case OrderBookResponse(event, time, payload) => core.orderBookHandler(payload)
-      //case InstrumentInfoResponse(event, time, payload) => ???
+      case CandleResponse(event, time, payload) => {
+        notifier.notify(174861972, payload.toString)
+        Sync[F].delay( println(payload) )
+      }
+      case OrderBookResponse(event, time, payload) => Sync[F].delay( println(payload) )
+      case InstrumentInfoResponse(event, time, payload) => Sync[F].delay( println(payload) )
     }
   }
 }
+
+trait Notifier[F[_]] {
+  implicit def notify(id: Int, message: String): F[Unit]
+}
+
+class TelegramUserNotifier[F[_]](/*tgbot: TgBotNotifier[F]*/) extends Notifier[F] {
+  override def notify(id: Int, message: String): F[Unit] = {
+    //tgbot.send(id, message)
+    ???
+  }
+}
+
+//174861972
 
 object Main extends IOApp {
 
@@ -47,24 +63,19 @@ object Main extends IOApp {
       _ <- resources(config).use {
         case (tgHttpClient, tinvestHttpClient, blocker, wsClient, transactor) => {
           implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
+          implicit val notifier: Notifier[F] = new TelegramUserNotifier[F]()
+          implicit val handler: TInvestWSHandler[F] = new SomeHandler[F](notifier)
+          implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, handler)
           implicit val tinvestApi: TInvestApi[F] = new TInvestApiHttp4s[F](tinvestHttpClient, config.tinkoffInvestApiToken)
           implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
-          implicit val core: Core[F] = new CoreImpl[F]()
-          implicit val handler: TInvestWSHandler[F] = new SomeHandler[F]()
+          implicit val core: Core[F] = new CoreImpl[F](dbAccess, tinvestApi, tinvestWSApi)
           implicit val tgBot: TgBot[F] = new TgBot[F]()
-          implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, handler)
 
           for {
-            names <- dbAccess.getByID(1)
-            _ <- IO { println(names) }
-            _ <- tinvestWSApi.subscribeCandle("BBG00RPRPX12", "1min")
-            _ <- tinvestWSApi.subscribeCandle("BBG005HLSZ23", "1min")
-            _ <- tinvestWSApi.subscribeCandle("BBG00PC4M4X3", "1min")
-
             tinvestWsApiFiber <- tinvestWSApi.listen().start
             tgBotFiber <- tgBot.start().start
             _ <- core.start.start.void
-            //_ <- tgBotFiber.join
+            _ <- tgBotFiber.join
             _ <- tinvestWsApiFiber.join
           } yield ()
         }
@@ -74,6 +85,7 @@ object Main extends IOApp {
 
   def resources(config: Config): Resource[F, (Client[F], Client[F], Blocker, WSConnectionHighLevel[F], HikariTransactor[F])] = {
     import java.net.http.HttpClient
+
     import org.http4s.client.jdkhttpclient.{JdkWSClient, WSRequest}
 
     val wsUri = uri"wss://api-invest.tinkoff.ru/openapi/md/v1/md-openapi/ws"
