@@ -6,16 +6,12 @@ import github.ainr.db.DbAccess
 import github.ainr.tinvest4s.models.{CandleResolution, LimitOrderRequest, MarketOrderRequest, Operation}
 import github.ainr.tinvest4s.rest.client.TInvestApi
 import github.ainr.tinvest4s.websocket.client.TInvestWSApi
-import github.ainr.tinvest4s.websocket.response.{CandlePayload, InstrumentInfoPayload, OrderBookPayload}
 import org.slf4j.LoggerFactory
 
 
 trait Core[F[_]] {
   def start(): F[Unit]
   def handleTgMessage(userId: Long, text: String): F[String]
-  def candleHandler(candle: CandlePayload): F[Unit]
-  def orderBookHandler(orderBook: OrderBookPayload): F[Unit]
-  def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit]
 }
 
 class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
@@ -32,17 +28,6 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
       }
     } yield ()
   }
-
-  override def candleHandler(candle: CandlePayload): F[Unit] = {
-    for {
-      _ <- dbAccess.insertCandle(candle)
-      _ <- Sync[F].delay(log.info(s"CandleHandler: $candle"))
-    } yield ()
-  }
-
-  override def orderBookHandler(orderBook: OrderBookPayload): F[Unit] = ???
-
-  override def instrumentInfoHandler(instrumentInfo: InstrumentInfoPayload): F[Unit] = ???
 
   private def portfolioMsg(): F[String] = {
     for {

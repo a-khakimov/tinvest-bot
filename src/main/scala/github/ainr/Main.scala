@@ -17,7 +17,6 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Headers}
 import org.slf4j.LoggerFactory
 import telegramium.bots.high.{Api, BotApi}
-
 import scala.concurrent.duration.DurationInt
 
 // Composable Resource Management in Scala: https://hackernoon.com/composable-resource-management-in-scala-0g7b3y5u
