@@ -19,27 +19,12 @@ class TgBot[F[_]: Async : Timer](implicit val bot: Api[F], implicit val core: Co
       log.info(s"got message: $msg")
     } >> (msg match {
       case Text(text) => for {
-        reply <- core.handleTgMessage(text)
+        reply <- core.handleTgMessage(msg.chat.id, text)
         _ <- send(msg.chat.id, reply)
       } yield ()
       case _ => send(msg.chat.id, "_")
     })
   }
-
-  def send(chatId: Long, text: String): F[Unit] = {
-    Methods
-      .sendMessage(chatId = ChatIntId(chatId), text = text, parseMode = Some(Markdown))
-      .exec
-      .void >> Sync[F].delay {
-      log.info(s"send message[$chatId]: $text")
-    }
-  }
-}
-
-class TgBotNotifier[F[_]: Async : Timer](implicit val bot: Api[F])
-  extends LongPollBot[F](bot) with TgExtractors {
-
-  val log: Logger = LoggerFactory.getLogger("TgBotNotifier")
 
   def send(chatId: Long, text: String): F[Unit] = {
     Methods
