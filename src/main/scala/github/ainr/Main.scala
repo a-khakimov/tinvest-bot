@@ -2,6 +2,7 @@ package github.ainr
 
 import cats.effect.IO.ioConcurrentEffect
 import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
+import com.typesafe.scalalogging.LazyLogging
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import github.ainr.config.Config
@@ -17,13 +18,15 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Headers}
 import org.slf4j.LoggerFactory
 import telegramium.bots.high.{Api, BotApi}
+
 import scala.concurrent.duration.DurationInt
 
 // Composable Resource Management in Scala: https://hackernoon.com/composable-resource-management-in-scala-0g7b3y5u
 // Circular dependency in Scala: https://stackoverflow.com/questions/37037550/circular-dependency-in-scala
+// https://blog.softwaremill.com/9-tips-about-using-cats-in-scala-you-might-want-to-know-e1bafd365f88
 
 
-object Main extends IOApp {
+object Main extends IOApp with LazyLogging {
 
   type F[+T] = IO[T]
 

@@ -3,10 +3,11 @@ package github.ainr.domain
 import cats.effect.Sync
 import cats.implicits._
 import github.ainr.db.DbAccess
-import github.ainr.tinvest4s.models.{CandleResolution, LimitOrderRequest, MarketOrderRequest, Operation}
+import github.ainr.tinvest4s.models.{CandleResolution, LimitOrderRequest, MarketOrderRequest, Operation, PlacedOrder}
 import github.ainr.tinvest4s.rest.client.TInvestApi
 import github.ainr.tinvest4s.websocket.client.TInvestWSApi
 import org.slf4j.LoggerFactory
+import ujson.IndexedValue.False
 
 
 trait Core[F[_]] {
@@ -19,6 +20,7 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
                      implicit val tinvestWSApi: TInvestWSApi[F]) extends Core[F] {
 
   private val log = LoggerFactory.getLogger("Core")
+
 
   def start(): F[Unit] = {
     for {
@@ -76,20 +78,6 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
     }
   }
 
-  private def parseMarketOrderArgs(text: String): Option[(Int, String)] = {
-    val args = text.filter(c => c != '/' || c != ' ').split('.')
-    args.size match {
-      case 3 => {
-        val figi = args(1)
-        args(2).toIntOption match {
-          case lots if lots.isDefined => Some(lots.get, figi)
-          case _ => None
-        }
-      }
-      case _ => None
-    }
-  }
-
   private def doLimitOrder(operation: String, text: String): F[String] = {
     val parsedArgs = parseLimitOrderArgs(text)
     parsedArgs match {
@@ -107,7 +95,34 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
     }
   }
 
-  private def doMarketOrder(operation: String, args: String): F[String] = {
+  private def parseMarketOrderArgs(args: Array[String]): Option[(Int, String)] = {
+    val figi = args(1)
+    args(2).toIntOption match {
+      case lots if lots.isDefined => Some(lots.get, figi)
+      case _ => None
+    }
+  }
+
+  private def parseSmartMarketOrderBuyArgs(args: Array[String]): Option[(String, Int, Double, Double)] = {
+    val figi = args(1)
+    (args(2).toIntOption, args(3).toDoubleOption, args(4).toDoubleOption) match {
+      case (lots, sloss, tprofit) if lots.isDefined && sloss.isDefined && tprofit.isDefined => {
+        Some(figi, lots.get, sloss.get, tprofit.get)
+      }
+      case _ => None
+    }
+  }
+
+  private def doMarketOrderCmd(operation: String, args: String, userId: Long = 0): F[String] = {
+    val sArgs = args.filter(c => c != '/' || c != ' ').split('.')
+    sArgs.size match {
+      case 3 => doSimpleMarketOrder(operation, sArgs)
+      case 5 => doSmartMarketOrderBuy(userId, sArgs)
+      case _ => "Wrong command".pure[F]
+    }
+  }
+
+  private def doSimpleMarketOrder(operation: String, args: Array[String]) = {
     val parsedArgs = parseMarketOrderArgs(args)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -122,6 +137,81 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
         } yield reply
       }
     }
+  }
+
+  private def doSmartMarketOrderBuy(userId: Long, args: Array[String]): F[String] = {
+    val parsedArgs = parseSmartMarketOrderBuyArgs(args)
+    parsedArgs match {
+      case None => s"Wrong command".pure[F]
+      case Some(args: (String, Int, Double, Double)) => {
+        val (figi, lots, stopLoss, takeProfit) = args
+        for {
+          checkRes <- checkStopLossAndTakeProfit(figi, stopLoss, takeProfit)
+          msg <- checkRes match {
+            case Left(e) => e.pure[F]
+            case Right(checkMsg) => {
+              for {
+                orderE <- tinvestRestApi.marketOrder(figi, MarketOrderRequest(lots, Operation.Buy))
+                msg <- orderE match {
+                  case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`".pure[F]
+                  case Right(order) => for {
+                    _ <- registerOperation(figi, stopLoss, takeProfit, userId, order.payload)
+                    msg <- s"""|$checkMsg
+                               |Выполнена покупка акций $figi, количество $lots
+                               |""".stripMargin.pure[F]
+                  } yield msg
+                }
+              } yield msg
+            }
+          }
+        } yield msg
+      }
+    }
+  }
+
+  private def checkStopLossAndTakeProfit(figi: String, stopLoss: Double, takeProfit: Double): F[Either[String, String]] = {
+    for {
+      orderBookE <- tinvestRestApi.orderbook(figi, 1)
+      result <- orderBookE match {
+        case Left(e) => Left(s"${e.status}: ${e.payload.message.getOrElse("Unknown")}").pure[F]
+        case Right(orderBook) => {
+          orderBook.payload.lastPrice match {
+            case None => Left(s"Не удалось получить текущую стоимость для $figi").pure[F]
+            case Some(lastPrice) => {
+              if (lastPrice <= stopLoss) Left(s"StopLoss($stopLoss) выше чем стоимость акции ($lastPrice)").pure[F]
+              else if (lastPrice >= takeProfit) Left(s"TakeProfit($takeProfit) ниже чем стоимость акции ($lastPrice)").pure[F]
+              else Right(s"Текущая стоимость акции ($lastPrice)").pure[F]
+            }
+          }
+        }
+      }
+    } yield result
+  }
+
+  private def registerOperation(figi: String, stopLoss: Double, takeProfit: Double, userId: Long, order: PlacedOrder): F[Unit] = {
+    val operation = BotOperation(
+      None,
+      figi,
+      stopLoss,
+      takeProfit,
+      OperationStatus.Active,
+      order.orderId,
+      order.status,
+      order.operation,
+      order.requestedLots,
+      order.executedLots,
+      userId
+    )
+    for {
+      _ <- dbAccess.insertOperation(operation)
+      currentOps <- dbAccess.getOpsByStatus(OperationStatus.Active)
+      _ <- {
+        val subscribed = currentOps.exists(_.figi == figi)
+        if (subscribed) Sync[F].delay(log.info(s"This $figi was previously subscribed"))
+        else tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`)
+      }
+      /* Делаем подписку на свечи только при условии если подписка на figi отсутствует */
+    } yield ()
   }
 
   private def doCancelOrder(args: String): F[String] = {
@@ -150,7 +240,7 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
   }
 
   private def doOrderbook(args: String): F[String] = {
-    val parsedArgs = parseMarketOrderArgs(args)
+    val parsedArgs = parseOrderbookArgs(args)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
       case Some(args: (Int, String)) =>
@@ -171,81 +261,6 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
     }
   }
 
-  private def parseSmartMarketOrderBuyArgs(text: String): Option[(String, Int, Double, Double)] = {
-    val args = text.filter(c => c != '/' || c != ' ').split('.')
-    args.size match {
-      case 5 => {
-        val figi = args(1)
-        (args(2).toIntOption, args(3).toDoubleOption, args(4).toDoubleOption) match {
-          case (lots, sloss, tprofit) if lots.isDefined && sloss.isDefined && tprofit.isDefined => {
-            Some(figi, lots.get, sloss.get, tprofit.get)
-          }
-          case _ => None
-        }
-      }
-      case _ => None
-    }
-  }
-
-  /*
-  * TODO: упростить!
-  * */
-  private def doSmartMarketOrderBuy(userId: Long, args: String): F[String] = {
-    val parsedArgs = parseSmartMarketOrderBuyArgs(args)
-    parsedArgs match {
-      case None => s"Wrong command".pure[F]
-      case Some(args: (String, Int, Double, Double)) => {
-        val (figi, lots, stoploss, takeprofit) = args
-        for {
-          orderbookE <- tinvestRestApi.orderbook(figi, 1)
-          msg <- orderbookE match {
-            case Left(e) => s"${e.status}: ${e.payload.message.getOrElse("Unknown")}".pure[F]
-            case Right(orderbook) => {
-              orderbook.payload.lastPrice match {
-                case None => s"Last price for $figi isn't defined".pure[F]
-                case lastPriceOpt => {
-                  val lastPrice = lastPriceOpt.get
-                  if (lastPrice < stoploss)
-                    s"Значение StopLoss($stoploss) выше чем текущая стоимость акции ($lastPrice)".pure[F]
-                  else if (lastPrice > takeprofit)
-                    s"Значение TakeProfit($takeprofit) ниже чем текущая стоимость акции ($lastPrice)".pure[F]
-                  else {
-                    for {
-                      orderE <- tinvestRestApi.marketOrder(figi, MarketOrderRequest(lots, Operation.Buy))
-                      msg <- orderE match {
-                        case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`".pure[F]
-                        case Right(order) => {
-                          val operation = BotOperation(
-                            None,
-                            figi,
-                            stoploss,
-                            takeprofit,
-                            OperationStatus.Active,
-                            order.payload.orderId,
-                            order.payload.status,
-                            order.payload.operation,
-                            order.payload.requestedLots,
-                            order.payload.executedLots,
-                            userId
-                          )
-                          for {
-                            _ <- tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`)
-                            _ <- dbAccess.insertOperation(operation)
-                            msg <- s"Выполнена покупка акций $figi, количество $lots, цена ($lastPrice)".pure[F]
-                          } yield msg
-                        }
-                      }
-                    } yield msg
-                  }
-                }
-              }
-            }
-          }
-        } yield msg
-      }
-    }
-  }
-
   override def handleTgMessage(userId: Long, text: String): F[String] = {
     for {
       reply <- text match {
@@ -255,13 +270,12 @@ class CoreImpl[F[_]: Sync](implicit dbAccess: DbAccess[F],
         case "/bonds" => marketInstrumentMsg("bonds") /* TODO: слишком длинное сообщение */
         case "/etfs" => marketInstrumentMsg("etfs")
         case "/currencies" => marketInstrumentMsg("currencies")
-        case args if args.startsWith("/orderbook") => doOrderbook(args)
-        case args if args.startsWith("/cancelOrder") => doCancelOrder(args)
-        case args if args.startsWith("/limitOrderBuy") => doLimitOrder("Buy", args)
-        case args if args.startsWith("/limitOrderSell") => doLimitOrder("Sell", args)
-        case args if args.startsWith("/marketOrderBuy") => doMarketOrder("Buy", args)
-        case args if args.startsWith("/marketOrderSell") => doMarketOrder("Sell", args)
-        case args if args.startsWith("/smartMarketOrderBuy") => doSmartMarketOrderBuy(userId, args)
+        case args if args.startsWith("/orderbook.") => doOrderbook(args)
+        case args if args.startsWith("/cancelOrder.") => doCancelOrder(args)
+        case args if args.startsWith("/limitOrderBuy.") => doLimitOrder("Buy", args)
+        case args if args.startsWith("/limitOrderSell.") => doLimitOrder("Sell", args)
+        case args if args.startsWith("/marketOrderBuy.") => doMarketOrderCmd("Buy", args, userId)
+        case args if args.startsWith("/marketOrderSell.") => doMarketOrderCmd("Sell", args, userId)
         case _ => helpMsg()
       }
     } yield reply
