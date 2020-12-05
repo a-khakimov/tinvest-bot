@@ -15,8 +15,7 @@ package object config {
 
   case class Config(database: DbConfig,
                      tgBotApiToken: String,
-                     tinkoffInvestApiToken: String,
-                     tinkoffInvestWss: String)
+                     tinkoffInvestApiToken: String)
 
   object Config {
     import pureconfig.generic.auto._

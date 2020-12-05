@@ -300,9 +300,10 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         s"Список активных операций пуст".pure[F]
       } else {
         ops.map {
-          op => s"""|`${op.id.getOrElse(-1)} ${op.figi} lots ${op.executedLots}
-                    |take profit ${op.takeProfit} stop loss ${op.stopLoss}`
-                    |""".stripMargin
+          op =>
+            s"""
+            |`${op.id.getOrElse(-1)} ${op.figi} Lots=${op.executedLots} TakeProfit=${op.takeProfit} StopLoss=${op.stopLoss}`
+            |""".stripMargin
         }.mkString("").pure[F]
       }
     } yield msg

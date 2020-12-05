@@ -12,13 +12,10 @@ import github.ainr.db.{DB, DbAccess}
 import github.ainr.domain._
 import github.ainr.telegram.TgBot
 import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
-import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s, TInvestWSHandler}
+import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s, TInvestWSAuthorization, TInvestWSHandler}
 import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.jdkhttpclient.WSConnectionHighLevel
-import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Header, Headers}
-import org.slf4j.LoggerFactory
 import telegramium.bots.high.{Api, BotApi}
 
 import scala.concurrent.duration.DurationInt
@@ -31,8 +28,6 @@ import scala.concurrent.duration.DurationInt
 object Main extends IOApp with LazyLogging {
 
   type F[+T] = IO[T]
-
-  private val log = LoggerFactory.getLogger("Main")
 
   override def run(args: List[String]): IO[ExitCode] = {
     for {
@@ -71,13 +66,14 @@ object Main extends IOApp with LazyLogging {
   def resources(config: Config): Resource[F, (Client[F], Client[F], Blocker, WSConnectionHighLevel[F], HikariTransactor[F])] = {
     import java.net.http.HttpClient
 
-    import org.http4s.client.jdkhttpclient.{JdkWSClient, WSRequest}
-
-    val wsUri = uri"wss://api-invest.tinkoff.ru/openapi/md/v1/md-openapi/ws"
-    val wsHeaders = Headers.of(Header("Authorization", s"Bearer ${config.tinkoffInvestApiToken}"))
+    import org.http4s.client.jdkhttpclient.JdkWSClient
 
     for {
-      wsClient <- JdkWSClient[F](HttpClient.newHttpClient()).connectHighLevel(WSRequest(wsUri, wsHeaders))
+      wsClient <- JdkWSClient[F](HttpClient.newHttpClient())
+        .connectHighLevel(
+          TInvestWSAuthorization()
+            .withToken(config.tinkoffInvestApiToken)
+        )
       httpClEc <- ExecutionContexts.cachedThreadPool[F]
       tgHttpClEc <- ExecutionContexts.cachedThreadPool[F]
       dbEc <- ExecutionContexts.cachedThreadPool[F]
