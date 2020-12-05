@@ -51,20 +51,20 @@ StopLoss, TakeProfit для инвестиций
 * [x] `/portfolio` - Портфель
 * [x] `/etfs` - Получение списка ETF
 * [x] `/currencies` - Получение списка валютных пар
-* [x] `/orderbook.figi.depth` - Получение стакана по FIGI
-* [x] `/cancelOrder.orderId` - Отмена заявки по OrderId
-* [x] `/limitOrderBuy.figi.lots.price` - Создание лимитной заявки на покупку
-* [x] `/limitOrderSell.figi.lots.price` - Создание лимитной заявки на продажу
-* [x] `/marketOrderBuy.figi.lots` - Создание рыночной заявки на покупку
-* [x] `/marketOrderSell.figi.lots` - Создание рыночной заявки на продажу
+* [x] `/orderbook.figi.depth` - Получение стакана по `FIGI`
+* [x] `/cancelOrder.orderId` - Отмена заявки по `OrderId`
+* [x] `/limitOrderBuy.figi.lots.price` - Лимитная заявка на покупку
+* [x] `/limitOrderSell.figi.lots.price` - Лимитная заявка на продажу
+* [x] `/marketOrderBuy.figi.lots` - Рыночная заявка на покупку
+* [x] `/marketOrderSell.figi.lots` - Рыночная заявка на продажу
 
-### Более сложные команды
+### Дополнительные команды
 
-* [ ] `/marketOrderBuy.figi.lots.stoploss.takeprofit` - Создание рыночной заявки на покупку с указанными значениями `stoploss` и `takeprofit`. `stoploss` и `takeprofit` имеют тип `Double`. Например, команда `/marketOrderBuy.BBG009S39JX6.10.100,01.200,02` выполнит покупку 10 лотов акций `BBG009S39JX6` со значением `stoploss=10.100` и `takeprofit=200,02`. При этом значение stoploss не должна превышать значение текущей стоимости акции и, соответственно, значение `takeprofit` должна превышать текущую стоимость акции. Команда вернет информацию о покупке и id операции.   
-* [ ] `/aciveOrders` - Получить список активных операций
-* [ ] `/completedOrders` - Получить список последних завершенных операций
-* [ ] `/stopOrder.id` - Отменить операцию по id
-* [ ] `/stopAllOrders` - Отменить все активные операции 
+* [x] `/marketOrderBuy.figi.lots.stoploss.takeprofit` - Рыночная заявка на покупку с указанными значениями `stoploss` и `takeprofit`. `stoploss` и `takeprofit` имеют тип `Double`. Например, команда `/marketOrderBuy.BBG009S39JX6.10.100,01.200,02` выполнит покупку 10 лотов акций `BBG009S39JX6` со значением `stoploss=10.100` и `takeprofit=200,02`. При этом значение stoploss не должна превышать значение текущей стоимости акции и, соответственно, значение `takeprofit` должна превышать текущую стоимость акции. Команда вернет информацию о покупке и id операции.   
+* [x] `/activeOperations` - Список активных операций
+* [ ] `/completedOperations` - Получить список последних завершенных операций
+* [ ] `/stopOperations.id` - Отменить операцию по id
+* [ ] `/stopAllOperations` - Отменить все активные операции
 
 Под операцией подразумевается процесс подписки на отслеживание стоимости акции по `figi`, которая завершится по достижению значений `stoploss` и `takeprofit` или по команде `stop`.
 
