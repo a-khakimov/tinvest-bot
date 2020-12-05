@@ -10,7 +10,7 @@ import fs2.Stream
 import github.ainr.config.Config
 import github.ainr.db.{DB, DbAccess}
 import github.ainr.domain._
-import github.ainr.telegram.TgBot
+import github.ainr.telegram.{TgAuth, TgBot}
 import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
 import github.ainr.tinvest4s.websocket.client.{TInvestWSApi, TInvestWSApiHttp4s, TInvestWSAuthorization, TInvestWSHandler}
 import org.http4s.client.Client
@@ -37,7 +37,7 @@ object Main extends IOApp with LazyLogging {
         case (tgHttpClient, tinvestHttpClient, blocker, wsClient, transactor) => {
           implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
           implicit val notificationRepo: NotificationRepo[F] = new NotificationRepo[F]()
-          implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
+          implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, TgAuth().withToken(config.tgBotApiToken), blocker)
           implicit val wsHandler: TInvestWSHandler[F] = new WSHandler[F]()
           implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, wsHandler)
           implicit val tinvestApi: TInvestApi[F] = new TInvestApiHttp4s[F](tinvestHttpClient, config.tinkoffInvestApiToken)
