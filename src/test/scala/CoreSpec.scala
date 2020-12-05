@@ -25,7 +25,7 @@ class ExampleSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
 
   "Core Tests" - {
     "portfolio message" in {
-      core.portfolioMsg().asserting(_ shouldBe "[`figi instrumentType [name] balance 0.2, lots 10`]")
+      core.portfolioMsg().asserting(_ shouldBe "`figi instrumentType [name] balance 0.2, lots 10`")
     }
   }
 }
