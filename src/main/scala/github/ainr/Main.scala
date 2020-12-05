@@ -2,9 +2,11 @@ package github.ainr
 
 import cats.effect.IO.ioConcurrentEffect
 import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
+import cats.implicits.catsSyntaxFlatMapOps
 import com.typesafe.scalalogging.LazyLogging
 import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
+import fs2.Stream
 import github.ainr.config.Config
 import github.ainr.db.{DB, DbAccess}
 import github.ainr.domain._
@@ -39,7 +41,7 @@ object Main extends IOApp with LazyLogging {
       _ <- resources(config).use {
         case (tgHttpClient, tinvestHttpClient, blocker, wsClient, transactor) => {
           implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
-          implicit val notificationRepo = new NotificationRepo[F]()
+          implicit val notificationRepo: NotificationRepo[F] = new NotificationRepo[F]()
           implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, s"https://api.telegram.org/bot${config.tgBotApiToken}", blocker)
           implicit val wsHandler: TInvestWSHandler[F] = new WSHandler[F]()
           implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, wsHandler)
@@ -51,8 +53,13 @@ object Main extends IOApp with LazyLogging {
           for {
             tinvestWsApiFiber <- tinvestWSApi.listen().start
             tgBotFiber <- tgBot.start().start
-            _ <- core.start()
-            _ <- notifier.start(10.second)
+            _ <- (Stream.emit(()) ++ Stream.fixedRate[F](5.second))
+              .evalTap {
+                _ => {
+                  core.start() >>
+                    notifier.start()
+                }
+              }.compile.drain
             _ <- tgBotFiber.join
             _ <- tinvestWsApiFiber.join
           } yield ()

@@ -1,12 +1,9 @@
 package github.ainr.domain
 
-import cats.implicits._
 import cats.effect.{Sync, Timer}
-import fs2.Stream
+import cats.implicits._
 import github.ainr.telegram.TgBot
 import org.slf4j.LoggerFactory
-
-import scala.concurrent.duration.FiniteDuration
 
 class TelegramUserNotifier[F[_]: Sync : Timer](implicit tgbot: TgBot[F],
                                                implicit val notificationRepo: NotificationRepo[F])
@@ -22,14 +19,10 @@ class TelegramUserNotifier[F[_]: Sync : Timer](implicit tgbot: TgBot[F],
     } yield ()
   }
 
-  override def start(every: FiniteDuration): F[Unit] = {
-    (Stream.emit(()) ++ Stream.fixedRate[F](every))
-      .evalTap {
-        _ => for {
-          notifications <- notificationRepo.pull()
-          _ <- notify(notifications)
-          _ <- Sync[F].delay(log.info("Notify..."))
-        } yield ()
-      }.compile.drain
+  override def start(): F[Unit] = {
+    for {
+      notifications <- notificationRepo.pull()
+      _ <- notify(notifications)
+    } yield ()
   }
 }

@@ -2,41 +2,36 @@ package github.ainr.domain
 
 import cats.effect.{Sync, Timer}
 import cats.implicits._
-import fs2.Stream
 import github.ainr.db.DbAccess
 import github.ainr.domain.OperationStatus.OperationStatus
 import github.ainr.tinvest4s.models.Operation.Operation
-import github.ainr.tinvest4s.models.{CandleResolution, LimitOrderRequest, MarketOrderRequest, Operation, PlacedOrder}
+import github.ainr.tinvest4s.models._
 import github.ainr.tinvest4s.rest.client.TInvestApi
 import github.ainr.tinvest4s.websocket.client.TInvestWSApi
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration.DurationInt
-
 
 trait Core[F[_]] {
+  def init(): F[Unit]
   def start(): F[Unit]
   def handleTgMessage(userId: Long, text: String): F[String]
 }
 
 class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
-                     implicit val tinvestRestApi: TInvestApi[F],
-                     implicit val tinvestWSApi: TInvestWSApi[F]) extends Core[F] {
+                                   implicit val tinvestRestApi: TInvestApi[F],
+                                   implicit val tinvestWSApi: TInvestWSApi[F],
+                                   implicit val notificationRepo: NotificationRepo[F])
+  extends Core[F] {
 
   private val log = LoggerFactory.getLogger("Core")
 
-
-  def start(): F[Unit] = {
+  override def start(): F[Unit] = {
     for {
-      _ <- init()
-      _ <- (Stream.emit(()) ++ Stream.fixedRate[F](1.second))
-        .evalTap {
-          _ => marketOrderSellByOperation()
-        }.compile.drain
+      _ <- marketOrderSellByOperation()
     } yield ()
   }
 
-  private def init(): F[Unit] = {
+  override def init(): F[Unit] = {
     for {
       activeOps <- dbAccess.getOpsByStatus(OperationStatus.Active)
       _ <- activeOps.map(_.figi).distinct.traverse {
@@ -57,7 +52,9 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
               case Left(e) => Sync[F].delay(log.error(s"Error market order request - ${e.status} ${e.payload}"))
               case Right(r) => op.id match {
                 case None => Sync[F].delay(log.error("Unknown operation id"))
-                case Some(id) => dbAccess.updateOperationStatus(id, OperationStatus.Completed)
+                case Some(id) => dbAccess.updateOperationStatus(id, OperationStatus.Completed) >>
+                  Sync[F].delay(log.error(s"Success market order sell $id ${r.status} ${r.payload}")) >>
+                  notificationRepo.push(Notification(op.tgUserId, s"Success market order sell $id"))
               }
             }
           } yield ()
@@ -299,11 +296,15 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
   private def activeOperations: F[String] = {
     for {
       ops <- dbAccess.getOpsByStatus(OperationStatus.Active)
-      msg <- ops.map {
-        op =>
-          s"""|`${op.id.getOrElse(-1)} ${op.figi} lots ${op.executedLots} take profit ${op.takeProfit} stop loss ${op.stopLoss}`
-              |""".stripMargin
-      }.mkString("").pure[F]
+      msg <- if (ops.isEmpty) {
+        s"Список активных операций пуст".pure[F]
+      } else {
+        ops.map {
+          op => s"""|`${op.id.getOrElse(-1)} ${op.figi} lots ${op.executedLots}
+                    |take profit ${op.takeProfit} stop loss ${op.stopLoss}`
+                    |""".stripMargin
+        }.mkString("").pure[F]
+      }
     } yield msg
   }
 

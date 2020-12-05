@@ -1,12 +1,12 @@
 package github.ainr.telegram
 
-import cats.implicits._
 import cats.effect.{Async, Sync, Timer}
+import cats.implicits._
 import github.ainr.domain.Core
 import org.slf4j.{Logger, LoggerFactory}
-import telegramium.bots.{ChatIntId, Markdown, Message}
 import telegramium.bots.high.implicits._
 import telegramium.bots.high.{Api, LongPollBot, Methods}
+import telegramium.bots.{ChatIntId, Markdown, Message}
 
 
 class TgBot[F[_]: Async : Timer](implicit val bot: Api[F], implicit val core: Core[F])
