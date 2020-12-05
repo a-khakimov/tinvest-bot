@@ -24,10 +24,11 @@ class TelegramUserNotifier[F[_]: Sync : Timer](implicit tgbot: TgBot[F],
 
   override def start(every: FiniteDuration): F[Unit] = {
     (Stream.emit(()) ++ Stream.fixedRate[F](every))
-      .evalTap { _ =>
-        for {
+      .evalTap {
+        _ => for {
           notifications <- notificationRepo.pull()
           _ <- notify(notifications)
+          _ <- Sync[F].delay(log.info("Notify..."))
         } yield ()
       }.compile.drain
   }

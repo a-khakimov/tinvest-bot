@@ -1,6 +1,5 @@
 package github.ainr.domain
 
-import cats.implicits._
 import github.ainr.db.DbAccess
 
 class NotificationRepo[F[_]](implicit dbAccess: DbAccess[F]) {

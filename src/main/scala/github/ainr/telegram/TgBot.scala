@@ -31,7 +31,7 @@ class TgBot[F[_]: Async : Timer](implicit val bot: Api[F], implicit val core: Co
       .sendMessage(chatId = ChatIntId(chatId), text = text, parseMode = Some(Markdown))
       .exec
       .void >> Sync[F].delay {
-      log.info(s"send message[$chatId]: $text")
+      log.info(s"send message[$chatId]:\n$text")
     }
   }
 }
