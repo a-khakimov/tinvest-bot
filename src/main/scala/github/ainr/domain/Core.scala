@@ -63,7 +63,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     } yield ()
   }
 
-  private def portfolioMsg(): F[String] = {
+  def portfolioMsg(): F[String] = {
     for {
       portfolio <- tinvestRestApi.getPortfolio
       _ <- Sync[F].delay(log.info(portfolio.toString))

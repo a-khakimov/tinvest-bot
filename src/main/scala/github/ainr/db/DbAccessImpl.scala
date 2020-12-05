@@ -8,7 +8,7 @@ import github.ainr.domain.OperationStatus.OperationStatus
 import github.ainr.tinvest4s.websocket.response.CandlePayload
 
 
-class DbAccess[F[_]: Bracket[*[_], Throwable]](transactor: Transactor[F]) {
+class DbAccessImpl[F[_]: Bracket[*[_], Throwable]](transactor: Transactor[F]) extends DbAccess[F] {
 
   def insertCandle(candle: CandlePayload): F[Int] = {
     Queries.insertCandle(candle).run.transact(transactor)

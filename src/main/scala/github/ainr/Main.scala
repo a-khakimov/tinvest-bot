@@ -8,7 +8,7 @@ import doobie.ExecutionContexts
 import doobie.hikari.HikariTransactor
 import fs2.Stream
 import github.ainr.config.Config
-import github.ainr.db.{DB, DbAccess}
+import github.ainr.db.{DB, DbAccess, DbAccessImpl}
 import github.ainr.domain._
 import github.ainr.telegram.{TgAuth, TgBot}
 import github.ainr.tinvest4s.rest.client.{TInvestApi, TInvestApiHttp4s}
@@ -35,8 +35,8 @@ object Main extends IOApp with LazyLogging {
       config <- Config.load[F](configFile)
       _ <- resources(config).use {
         case (tgHttpClient, tinvestHttpClient, blocker, wsClient, transactor) => {
-          implicit val dbAccess: DbAccess[F] = new DbAccess[F](transactor)
-          implicit val notificationRepo: NotificationRepo[F] = new NotificationRepo[F]()
+          implicit val dbAccess: DbAccess[F] = new DbAccessImpl[F](transactor)
+          implicit val notificationRepo: NotificationRepo[F] = new NotificationRepoImpl[F]()
           implicit val tgBotApi: Api[F] = new BotApi[F](tgHttpClient, TgAuth().withToken(config.tgBotApiToken), blocker)
           implicit val wsHandler: TInvestWSHandler[F] = new WSHandler[F]()
           implicit val tinvestWSApi: TInvestWSApi[F] = new TInvestWSApiHttp4s[F](wsClient, wsHandler)

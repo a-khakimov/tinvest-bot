@@ -37,8 +37,11 @@ libraryDependencies ++= Seq(
   "io.github.apimorphism" %% "telegramium-core" % telegramiumVersion,
   "io.github.apimorphism" %% "telegramium-high" % telegramiumVersion,
   "com.github.pureconfig" %% "pureconfig" % pureConfigVersion,
-  "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime,
-  //"com.lihaoyi" %% "acyclic" % "0.2.0" % "provided",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
+  "org.scalamock" %% "scalamock" % "4.4.0" % Test,
+  "org.scalatest" %% "scalatest" % "3.1.0" % Test,
+  "com.codecommit" %% "cats-effect-testing-scalatest" % "0.4.2" % Test
+  //"ch.qos.logback" % "logback-classic" % "1.2.3" % Runtime,
 )
 
 scalacOptions ++= Seq(
@@ -47,4 +50,3 @@ scalacOptions ++= Seq(
 )
 
 addCompilerPlugin("org.typelevel" % "kind-projector" % "0.11.1" cross CrossVersion.full)
-//addCompilerPlugin("com.lihaoyi" %% "acyclic" % "0.2.0")
