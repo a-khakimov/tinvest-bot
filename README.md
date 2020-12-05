@@ -1,3 +1,8 @@
+![Scala CI](https://github.com/a-khakimov/tinvest-bot/workflows/Scala%20CI/badge.svg?branch=main)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=ncloc)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=code_smells)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=coverage)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
+
 # tinvest-bot
 
 Курсовой проект в рамках курса «Scala».
@@ -42,7 +47,7 @@ StopLoss, TakeProfit для инвестиций
 * Первый способ взаимодействия можно сделать через http-api
 * Второй способ - через telegram-бота (уведомления и команды)
 
-На данном этапе, думаю, стоит реализовать второй способ, поскольку он проще и быстрее для тестирования и проверки.  
+На данном этапе, думаю, стоит реализовать второй способ, поскольку он проще и быстрее для тестирования и проверки.
 
 ## Взаимодействие через telegram
 
