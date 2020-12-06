@@ -17,6 +17,17 @@ trait Core[F[_]] {
   def handleTgMessage(userId: Long, text: String): F[String]
 }
 
+
+
+/**
+ * В этом классе сосредоточена логика по работе с ботом
+ *
+ * @param dbAccess Для доступа к базе данных
+ * @param tinvestRestApi Для взаимодействия с REST Тинькофф OpenApi
+ * @param tinvestWSApi Для взаимодействия со Streaming Тинькофф OpenApi
+ * @param notificationRepo Для отправки уведимлений пользователю
+ * @author [[https://github.com/a-khakimov]]
+ */
 class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
                                    implicit val tinvestRestApi: TInvestApi[F],
                                    implicit val tinvestWSApi: TInvestWSApi[F],
@@ -25,6 +36,10 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
 
   private val log = LoggerFactory.getLogger("Core")
 
+  /**
+   *
+   * @return
+   */
   override def start(): F[Unit] = {
     for {
       _ <- marketOrderSellByOperation()
@@ -109,7 +124,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  private def doLimitOrder(operation: String, text: String): F[String] = {
+  def doLimitOrder(operation: String, text: String): F[String] = {
     val parsedArgs = parseLimitOrderArgs(text)
     parsedArgs match {
       case None => s"Wrong command".pure[F]
@@ -142,7 +157,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
   }
 
-  private def doMarketOrderCmd(operation: String, args: String, userId: Long = 0): F[String] = {
+  def doMarketOrderCmd(operation: String, args: String, userId: Long = 0): F[String] = {
     val sArgs = args.filter(c => c != '/' || c != ' ').split('.')
     sArgs.length match {
       case 3 => doSimpleMarketOrder(operation, sArgs)
@@ -346,8 +361,6 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case args if args.startsWith("/marketOrderBuy.") => doMarketOrderCmd("Buy", args, userId)
         case args if args.startsWith("/marketOrderSell.") => doMarketOrderCmd("Sell", args, userId)
         case "/activeOperations" => activeOperations
-        //case "/stopAllOperations" => setOperationsStatus(OperationStatus.Stop)
-        //case "/startAllOperations" => setOperationsStatus(OperationStatus.Active)
         case _ => helpMsg()
       }
     } yield reply
@@ -369,8 +382,6 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
        |Дополнительные команды:
        |/marketOrderBuy.`figi.lots.stoploss.takeprofit` - Рыночная заявка на покупку с указанными значениями `stoploss` и `takeprofit`
        |/activeOperations - Получить список активных операций
-       |/startAllOperations - Запустить все неактивные операции
-       |/stopAllOperations - Отменить все активные операции
        |""".stripMargin.pure[F]
     /*
     * - /stocks

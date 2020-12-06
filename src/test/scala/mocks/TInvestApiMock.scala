@@ -3,6 +3,7 @@ package mocks
 import cats.effect.Sync
 import cats.implicits._
 import github.ainr.tinvest4s.models.CandleResolution.CandleResolution
+import github.ainr.tinvest4s.models.TradeStatus.TradeStatus
 import github.ainr.tinvest4s.models._
 import github.ainr.tinvest4s.rest.client.TInvestApi
 
@@ -29,9 +30,39 @@ class TInvestApiMock[F[_]: Sync] extends TInvestApi[F] {
     ).withLeft[TInvestError].pure[F]
   }
 
-  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[TInvestError, OrdersResponse]] = ???
+  override def limitOrder(figi: String, request: LimitOrderRequest): F[Either[TInvestError, OrdersResponse]] = {
+    Right(
+      OrdersResponse("trackingId", "Buy",
+        PlacedOrder(
+          "SomeOrderId",
+          "Buy",
+          "GoodOrderStatus",
+          Some("rejectReason"),
+          Some("message"),
+          request.lots,
+          request.lots,
+          None
+        )
+      )
+    ).withLeft[TInvestError].pure[F]
+  }
 
-  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[TInvestError, OrdersResponse]] = ???
+  override def marketOrder(figi: String, request: MarketOrderRequest): F[Either[TInvestError, OrdersResponse]] = {
+    Right(
+      OrdersResponse("trackingId", "Buy",
+        PlacedOrder(
+          "SomeOrderId",
+          "Buy",
+          "GoodOrderStatus",
+          Some("rejectReason"),
+          Some("message"),
+          request.lots,
+          request.lots,
+          None
+        )
+      )
+    ).withLeft[TInvestError].pure[F]
+  }
 
   override def cancelOrder(orderId: String): F[Either[TInvestError, EmptyResponse]] = ???
 
@@ -43,7 +74,25 @@ class TInvestApiMock[F[_]: Sync] extends TInvestApi[F] {
 
   override def currencies(): F[Either[TInvestError, MarketInstrumentListResponse]] = ???
 
-  override def orderbook(figi: String, depth: Int): F[Either[TInvestError, OrderbookResponse]] = ???
+  override def orderbook(figi: String, depth: Int): F[Either[TInvestError, OrderbookResponse]] = {
+    Right(
+      OrderbookResponse("trackingId", "SomeStatus",
+        Orderbook(
+          figi,
+          depth,
+          List(),
+          List(),
+          TradeStatus.NormalTrading,
+          10,
+          Some(5000),
+          Some(5000),
+          Some(5000),
+          Some(5000),
+          Some(5000)
+        )
+      )
+    ).withLeft[TInvestError].pure[F]
+  }
 
   override def candles(figi: String, interval: CandleResolution, from: String, to: String): F[Either[TInvestError, CandlesResponse]] = ???
 }
