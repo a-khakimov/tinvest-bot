@@ -87,7 +87,9 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
             pos => s"`${pos.figi} ${pos.instrumentType} [${pos.name}] balance ${pos.balance}, lots ${pos.lots}`"
           }.mkString("\n")
         }".pure[F]
-        case Left(e) => s"Error: ${e}".pure[F]
+        case Left(e) =>
+          Sync[F].delay(log.error(e.toString)) >>
+            s"Error: ${e.status}".pure[F]
       }
     } yield msg
   }
@@ -134,7 +136,10 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
           result <- tinvestRestApi.limitOrder(figi, LimitOrderRequest(lots, operation, price))
           reply = result match {
             case Right(r) => s"`Success: orderId - ${r.payload.orderId}`"
-            case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+            case Left(e) => {
+              log.error(e.toString)
+              s"`${e.status}`"
+            }
           }
         } yield reply
     }
@@ -176,7 +181,10 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
           result <- tinvestRestApi.marketOrder(figi, MarketOrderRequest(lots, operation))
           reply = result match {
             case Right(r) => s"`Success: orderId - ${r.payload.orderId}`"
-            case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+            case Left(e) => {
+              log.error(e.toString)
+              s"`${e.status}`"
+            }
           }
         } yield reply
     }
@@ -196,7 +204,9 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
               for {
                 orderE <- tinvestRestApi.marketOrder(figi, MarketOrderRequest(lots, Operation.Buy))
                 msg <- orderE match {
-                  case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`".pure[F]
+                  case Left(e) =>
+                    Sync[F].delay(log.error(e.toString)) >>
+                      s"${e.status}".pure[F]
                   case Right(order) => for {
                     _ <- registerOperation(figi, stopLoss, takeProfit, userId, order.payload)
                     msg <- s"""|$checkMsg
@@ -217,7 +227,9 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     for {
       orderBookE <- tinvestRestApi.orderbook(figi, 1)
       result <- orderBookE match {
-        case Left(e) => Left(s"${e.status}: ${e.payload.message.getOrElse("Unknown")}").pure[F]
+        case Left(e) =>
+          Sync[F].delay(log.error(e.toString)) >>
+            Left(s"${e.status}").pure[F]
         case Right(orderBook) =>
           orderBook.payload.lastPrice match {
             case None => Left(s"Не удалось получить текущую стоимость для $figi").pure[F]
@@ -255,8 +267,12 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       _ <- {
         /* Делаем подписку на свечи только при условии если подписка на figi отсутствует */
         val subscribed = currentOps.exists(_.figi == figi)
-        if (subscribed) Sync[F].delay(log.info(s"This $figi was previously subscribed"))
-        else tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`)
+        if (subscribed) {
+          Sync[F].delay(log.warn(s"This $figi was previously subscribed"))
+        } else {
+          tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`) >>
+            Sync[F].delay(log.info(s"subscribeCandle: $figi"))
+        }
       }
     } yield ()
   }
@@ -267,13 +283,16 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       result <- tinvestRestApi.cancelOrder(orderid)
       reply = result match {
         case Right(r) => s"`Success`"
-        case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+        case Left(e) => {
+          log.error(e.toString)
+          s"`${e.status}`"
+        }
       }
     } yield reply
   }
 
   private def parseOrderbookArgs(text: String): Option[(Int, String)] = {
-    val args = text.filter(c => c != '/' || c != ' ').split('.')
+    val args = text.filter(c => c != '&' || c != '/' || c != ' ').split('.')
     args.length match {
       case 3 =>
         val figi = args(1)
@@ -294,15 +313,20 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         for {
           result <- tinvestRestApi.orderbook(figi, depth)
           reply = result match {
-            case Right(ordbook) => s"""|`lastPrice:${ordbook.payload.lastPrice.getOrElse(0)}`
-                                       |`closePrice:${ordbook.payload.closePrice.getOrElse(0)}`
-                                       |`limitUp:${ordbook.payload.limitUp.getOrElse(0)}`
-                                       |`limitDown:${ordbook.payload.limitDown.getOrElse(0)}`
-                                       |`tradeStatus:${ordbook.payload.tradeStatus}`
-                                       |`bids:${ordbook.payload.bids.map(b => s"(${b.price} ${b.quantity})").mkString(",")}`
-                                       |`asks:${ordbook.payload.asks.map(a => s"(${a.price} ${a.quantity})").mkString(",")}`
-                                       |""".stripMargin
-            case Left(e) => s"`${e.status}: ${e.payload.message.getOrElse("Unknown")}`"
+            case Right(ordbook) => {
+              s"""|`lastPrice:${ordbook.payload.lastPrice.getOrElse(0)}`
+                  |`closePrice:${ordbook.payload.closePrice.getOrElse(0)}`
+                  |`limitUp:${ordbook.payload.limitUp.getOrElse(0)}`
+                  |`limitDown:${ordbook.payload.limitDown.getOrElse(0)}`
+                  |`tradeStatus:${ordbook.payload.tradeStatus}`
+                  |`bids:${ordbook.payload.bids.map(b => s"(${b.price} ${b.quantity})").mkString(",")}`
+                  |`asks:${ordbook.payload.asks.map(a => s"(${a.price} ${a.quantity})").mkString(",")}`
+                  |""".stripMargin
+            }
+            case Left(e) => {
+              log.error(e.toString)
+              s"`${e.status}`"
+            }
           }
         } yield reply
     }
@@ -316,9 +340,8 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       } else {
         ops.map {
           op =>
-            s"""
-            |`${op.id.getOrElse(-1)} ${op.figi} Lots=${op.executedLots} TakeProfit=${op.takeProfit} StopLoss=${op.stopLoss}`
-            |""".stripMargin
+            s"`UserID[${op.tgUserId}] [${op.id.getOrElse(-1)}] ${op.figi} " +
+              s"Lots=${op.executedLots} TakeProfit=${op.takeProfit} StopLoss=${op.stopLoss}`"
         }.mkString("").pure[F]
       }
     } yield msg
@@ -332,13 +355,17 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
     }
     for {
       ops <- dbAccess.getOpsByStatus(status)
-      results <- ops.traverse {
-        op => op.id match {
-          case None => s"Wrong operation id".pure[F]
-          case Some(id) =>
-            //dbAccess.updateOperationStatus(id, opStatus) >>
-              //Sync[F].delay(log.info("Updated status for $id to $opStatus")) >>
-              s"`$opStatus ${op.id} ${op.figi} ${op.stopLoss} ${op.takeProfit}`".pure[F]
+      results <- if (ops.isEmpty) {
+        Seq(s"Список активных операций пуст").pure[F]
+      } else {
+        ops.traverse {
+          op => op.id match {
+            case None => s"Wrong operation id".pure[F]
+            case Some(id) =>
+              dbAccess.updateOperationStatus(id, opStatus) >>
+                Sync[F].delay(log.info("Updated status for $id to $opStatus")) >>
+                s"`$opStatus ${op.id} ${op.figi} ${op.stopLoss} ${op.takeProfit}`".pure[F]
+          }
         }
       }
       msg <- results.mkString("\n").pure[F]
@@ -361,6 +388,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case args if args.startsWith("/marketOrderBuy.") => doMarketOrderCmd("Buy", args, userId)
         case args if args.startsWith("/marketOrderSell.") => doMarketOrderCmd("Sell", args, userId)
         case "/activeOperations" => activeOperations
+        case "/stopOperations" => setOperationsStatus(OperationStatus.Stop)
         case _ => helpMsg()
       }
     } yield reply
@@ -382,6 +410,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
        |Дополнительные команды:
        |/marketOrderBuy.`figi.lots.stoploss.takeprofit` - Рыночная заявка на покупку с указанными значениями `stoploss` и `takeprofit`
        |/activeOperations - Получить список активных операций
+       |/stopOperations - Остановить активные операции
        |""".stripMargin.pure[F]
     /*
     * - /stocks

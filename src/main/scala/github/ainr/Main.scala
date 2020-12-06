@@ -48,6 +48,7 @@ object Main extends IOApp with LazyLogging {
           for {
             tinvestWsApiFiber <- tinvestWSApi.listen().start
             tgBotFiber <- tgBot.start().start
+            _ <- core.init()
             _ <- (Stream.emit(()) ++ Stream.fixedRate[F](5.second))
               .evalTap {
                 _ => {
