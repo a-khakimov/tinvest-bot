@@ -49,7 +49,12 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
   override def init(): F[Unit] = {
     for {
       activeOps <- dbAccess.getOpsByStatus(OperationStatus.Active)
-      _ <- activeOps.map(_.figi).distinct.traverse {
+      _ <- activeOps.map {
+        op => {
+          Sync[F].delay(log.info(s"${op.figi} ${op.operationStatus}"))
+          op.figi
+        }
+      }.distinct.traverse {
         figi => tinvestWSApi.subscribeCandle(figi, CandleResolution.`1min`) >>
           Sync[F].delay(log.info(s"subscribeCandle: $figi"))
       }
@@ -66,10 +71,13 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
             _ <- orderResult match {
               case Left(e) => Sync[F].delay(log.error(s"Error market order request - ${e.status} ${e.payload}"))
               case Right(r) => op.id match {
-                case None => Sync[F].delay(log.error("Unknown operation id"))
-                case Some(id) => dbAccess.updateOperationStatus(id, OperationStatus.Completed) >>
-                  Sync[F].delay(log.error(s"Success market order sell $id ${r.status} ${r.payload}")) >>
-                  notificationRepo.push(Notification(op.tgUserId, s"Success market order sell $id"))
+                case None => Sync[F].delay(log.error("Unknown operation ID"))
+                case Some(id) =>
+                  tinvestWSApi.unsubscribeCandle(op.figi, CandleResolution.`1min`) >>
+                  dbAccess.updateOperationStatus(id, OperationStatus.Completed) >>
+                  Sync[F].delay(log.info(s"Success market order sell $id ${r.status} ${r.payload}")) >>
+                  notificationRepo.push(Notification(op.tgUserId,
+                    s"[$id] Рыночная заявка на продажу ${op.figi} выполнена успешно"))
               }
             }
           } yield ()
@@ -84,7 +92,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       _ <- Sync[F].delay(log.info(portfolio.toString))
       msg <- portfolio match {
         case Right(p) => s"${p.payload.positions.sortBy(_.instrumentType).map {
-            pos => s"`${pos.figi} ${pos.instrumentType} [${pos.name}] balance ${pos.balance}, lots ${pos.lots}`"
+            pos => s"`${pos.figi} ${pos.instrumentType} [${pos.name}] balance ${pos.balance}`"
           }.mkString("\n")
         }".pure[F]
         case Left(e) =>
@@ -262,8 +270,8 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
       userId
     )
     for {
-      _ <- dbAccess.insertOperation(operation)
       currentOps <- dbAccess.getOpsByStatus(OperationStatus.Active)
+      _ <- Sync[F].delay(log.info(currentOps.toString()))
       _ <- {
         /* Делаем подписку на свечи только при условии если подписка на figi отсутствует */
         val subscribed = currentOps.exists(_.figi == figi)
@@ -274,6 +282,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
             Sync[F].delay(log.info(s"subscribeCandle: $figi"))
         }
       }
+      _ <- dbAccess.insertOperation(operation)
     } yield ()
   }
 
@@ -292,7 +301,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
   }
 
   private def parseOrderbookArgs(text: String): Option[(Int, String)] = {
-    val args = text.filter(c => c != '&' || c != '/' || c != ' ').split('.')
+    val args = text.filter(c => c != '/' || c != ' ').split('.')
     args.length match {
       case 3 =>
         val figi = args(1)
@@ -341,30 +350,29 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         ops.map {
           op =>
             s"`UserID[${op.tgUserId}] [${op.id.getOrElse(-1)}] ${op.figi} " +
-              s"Lots=${op.executedLots} TakeProfit=${op.takeProfit} StopLoss=${op.stopLoss}`"
+              s"Lots=${op.executedLots} TakeProfit=${op.takeProfit} StopLoss=${op.stopLoss}`\n"
         }.mkString("").pure[F]
       }
     } yield msg
   }
 
-  private def setOperationsStatus(opStatus: OperationStatus): F[String] = {
-    val status = opStatus match {
-      case OperationStatus.Active => OperationStatus.Stop
-      case OperationStatus.Stop => OperationStatus.Active
-      case _ => OperationStatus.Stop
-    }
+  private def stopOperations: F[String] = {
     for {
-      ops <- dbAccess.getOpsByStatus(status)
+      ops <- dbAccess.getOpsByStatus(OperationStatus.Active)
       results <- if (ops.isEmpty) {
         Seq(s"Список активных операций пуст").pure[F]
       } else {
         ops.traverse {
           op => op.id match {
             case None => s"Wrong operation id".pure[F]
-            case Some(id) =>
-              dbAccess.updateOperationStatus(id, opStatus) >>
-                Sync[F].delay(log.info("Updated status for $id to $opStatus")) >>
-                s"`$opStatus ${op.id} ${op.figi} ${op.stopLoss} ${op.takeProfit}`".pure[F]
+            case Some(id) => {
+              for {
+                _ <- dbAccess.updateOperationStatus(id, OperationStatus.Stop)
+                _ <- tinvestWSApi.unsubscribeCandle(op.figi, CandleResolution.`1min`)
+                _ <- Sync[F].delay(log.info(s"Stop operation with id[$id]"))
+                msg <- s"`Stop $id ${op.figi} ${op.stopLoss} ${op.takeProfit}`".pure[F]
+              } yield msg
+            }
           }
         }
       }
@@ -388,7 +396,7 @@ class CoreImpl[F[_]: Sync : Timer](implicit dbAccess: DbAccess[F],
         case args if args.startsWith("/marketOrderBuy.") => doMarketOrderCmd("Buy", args, userId)
         case args if args.startsWith("/marketOrderSell.") => doMarketOrderCmd("Sell", args, userId)
         case "/activeOperations" => activeOperations
-        case "/stopOperations" => setOperationsStatus(OperationStatus.Stop)
+        case "/stopOperations" => stopOperations
         case _ => helpMsg()
       }
     } yield reply

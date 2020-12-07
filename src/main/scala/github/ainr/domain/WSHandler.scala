@@ -58,15 +58,10 @@ class WSHandler[F[_]: Sync : Timer](implicit notificationRepo: NotificationRepo[
   private def stopLoss(op: BotOperation, candle: CandlePayload): F[Unit] = {
     for {
       _ <- Sync[F].delay(log.info(s"Running stop loss operation for $candle"))
-      _ <- dbAccess.updateOperationStatus(op.id.get, OperationStatus.Running)
-      _ <- notificationRepo.push(
-        Notification(
-          op.tgUserId,
-          s"""|Running **stop loss** operation for ${op.figi}
-              |with close price ${candle.c} and stop loss value ${op.stopLoss}
-              |""".stripMargin
-        )
+      _ <- notificationRepo.push(Notification(op.tgUserId,
+        s"[${op.id.getOrElse(-1)}] Продажа акций ${op.figi} по событию StopLoss(${op.stopLoss}) по цене ${candle.c}")
       )
+      _ <- dbAccess.updateOperationStatus(op.id.get, OperationStatus.Running)
       _ <- dbAccess.insertCandle(candle)
     } yield ()
   }
@@ -74,15 +69,10 @@ class WSHandler[F[_]: Sync : Timer](implicit notificationRepo: NotificationRepo[
   private def takeProfit(op: BotOperation, candle: CandlePayload): F[Unit] = {
     for {
       _ <- Sync[F].delay(log.info(s"Running take profit operation for $candle"))
-      _ <- dbAccess.updateOperationStatus(op.id.get, OperationStatus.Running)
-      _ <- notificationRepo.push(
-        Notification(
-          op.tgUserId,
-          s"""|Running **take profit** operation for ${op.figi}
-              |with close price ${candle.c} and take profit value ${op.takeProfit}
-              |""".stripMargin
-        )
+      _ <- notificationRepo.push(Notification(op.tgUserId,
+        s"[${op.id.getOrElse(-1)}] Продажа акций ${op.figi} по событию TakeProfit(${op.takeProfit}) по цене ${candle.c}")
       )
+      _ <- dbAccess.updateOperationStatus(op.id.get, OperationStatus.Running)
       _ <- dbAccess.insertCandle(candle)
     } yield ()
   }
