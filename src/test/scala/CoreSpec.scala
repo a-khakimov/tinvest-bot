@@ -27,7 +27,7 @@ class CoreSpec extends AsyncFreeSpec with AsyncIOSpec with Matchers {
   "Core Good Tests" - {
 
     "portfolio" in {
-      core.portfolioMsg().asserting(_ shouldBe "`figi instrumentType [name] balance 0.2, lots 10`")
+      core.portfolioMsg().asserting(_ shouldBe "`figi instrumentType [name] balance 0.2`")
     }
 
     "limit order with bad command" in {
