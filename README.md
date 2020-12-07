@@ -24,6 +24,37 @@ StopLoss, TakeProfit для инвестиций
 
 Бот, для автоматизации выполнения заявок на покупки и продажи акций по заранее заданным значениям StopLoss/TakeProfit.
 
+## Стек используемых технологий
+
+* cats
+* doobie
+* postgres
+* http4s
+* circe
+* telegramium
+
+## Как собрать и запустить проект
+
+* Нужно иметь брокерский счет в [Тинькофф.Инвестиции](https://www.tinkoff.ru/invest/), если есть, то получить в [личном кабинете](https://www.tinkoff.ru/invest/) токен для авторизации 
+* Зарегистрировать telegram бота и получить токен для авторизации (для торговли на бирже или в песочнице)
+* Подготовить базу данных - создать пользователя и таблицы (*TODO: Следует автоматизировать этот этап*)
+
+```sql
+CREATE TABLE candles (id SERIAL, time TEXT, interval TEXT, figi TEXT, open REAL, close REAL, hight REAL, low REAL, volume REAL);
+
+CREATE TABLE operations (id SERIAL, figi TEXT, stopLoss REAL, takeProfit REAL,
+                         time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                         operationStatus TEXT, orderId TEXT, orderStatus TEXT, orderOperation TEXT,
+                         requestedLots INT, executedLots INT, tgUserId bigint);
+
+CREATE TABLE notifications (id SERIAL, userId INT, message TEXT);
+```
+* В файле конфигурации `application.conf` задать токены для авторизации telegram-бота и в OpenApi Тинькофф.Инвестиций, и имя/пароль для подключения к базе данных
+* Запустить проект 
+```bash
+$ sbt run
+```  
+
 ## Требования
 
 Бот должен:
