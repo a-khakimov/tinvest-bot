@@ -1,0 +1,75 @@
+@startuml
+title Component Diagram
+
+package "tinvest-bot" {
+  component [Core] as core
+  component [TgBot] as tgBot
+  component [NotificationRepo] as notificationRepo
+  component [Notifier] as notifier
+  component [DbAccess] as dbAccess
+  component [WSHandler] as wsHandler
+}
+
+package "tinvest4s" {
+  component [WebSocket Client] as streamingClient
+  component [REST Client] as restClient
+}
+
+note left of tinvest4s
+  Отдельный проект
+  для взаимодействия
+  с OpenApi
+end note
+
+
+note right of core
+  Обрабатывает сообщения пользователя,
+  выполняет определенные действия,
+  формирует ответы
+end note
+
+note left of notifier
+  Выгружает уведомления
+  из NotificationRepo
+  и отправляет пользователям
+end note
+
+note right of wsHandler
+  Получает Streaming события
+  от WebSocket-клиента
+  и выполняет обработку
+  (тут реализованы StopLoss и TakeProfit)
+end note
+
+database "PostgreSQL" {
+  [candles]
+  [operations]
+  [notifications]
+}
+
+cloud {
+  [Telegram]
+}
+
+cloud {
+  [Тинькофф.Инвестиции]
+}
+
+tinvest4s -up-> Тинькофф.Инвестиции
+tgBot -up-> Telegram
+
+core -up-> restClient
+core -up-> streamingClient
+core .down.> dbAccess
+wsHandler .down.> dbAccess
+wsHandler .left.> notificationRepo : push
+
+notificationRepo -down-> dbAccess
+notifier -down-> notificationRepo : pull()
+notifier -up-> tgBot : send()
+
+dbAccess -down-> PostgreSQL
+streamingClient -right-> wsHandler : handle
+
+tgBot -up-> core : handleTgMessage
+@enduml
