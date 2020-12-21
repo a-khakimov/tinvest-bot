@@ -19,8 +19,8 @@ jobs:
         with:
           java-version: 11
       
-      #- name: Run tests
-      #  run: sbt test
+      - name: Run tests
+        run: sbt test
 
       - name: Sonar scan
         env:
