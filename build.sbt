@@ -40,9 +40,10 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
   "org.scalamock" %% "scalamock" % "4.4.0" % Test,
   "org.scalatest" %% "scalatest" % "3.1.0" % Test,
-  "com.codecommit" %% "cats-effect-testing-scalatest" % "0.4.2" % Test
-  //"ch.qos.logback" % "logback-classic" % "1.2.3" % Runtime,
+  "com.codecommit" %% "cats-effect-testing-scalatest" % "0.4.2" % Test,
 )
+
+sonarProperties := Sonar.properties
 
 scalacOptions ++= Seq(
   "-Xfatal-warnings",
