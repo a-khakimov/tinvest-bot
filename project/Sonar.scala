@@ -1,9 +1,9 @@
 object Sonar {
   val properties = Map(
     "sonar.host.url" -> "https://sonarcloud.io",
-    "sonar.organization" -> "ainr",
+    "sonar.organization" -> "smarttap",
     "sonar.projectName" -> "tinvest-bot",
-    "sonar.projectKey" -> "tinvest-bot",
+    "sonar.projectKey" -> "a-khakimov_tinvest-bot",
     "sonar.sources" -> "src/main/scala",
     "sonar.tests" -> "src/test/scala",
     "sonar.sourceEncoding" -> "UTF-8",
