@@ -2,6 +2,7 @@
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=ncloc)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=code_smells)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=coverage)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=a-khakimov_tinvest-bot&metric=sqale_index)](https://sonarcloud.io/dashboard?id=a-khakimov_tinvest-bot)
 
 # tinvest-bot
 
